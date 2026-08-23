@@ -1,0 +1,118 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum NotificationChannel {
+  email
+  sms
+  push
+}
+
+enum NotificationStatus {
+  queued
+  processing
+  sent
+  failed
+  duplicate
+}
+
+enum LegalBasis {
+  treatment
+  consent
+  legal_obligation
+  legitimate_interest
+}
+
+model User {
+  id        String        @id
+  region    String        @default("US")
+  timezone  String?
+  locale    String?
+  channels  UserChannel[]
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+}
+
+model UserChannel {
+  id          String              @id @default(cuid())
+  userId      String
+  channel     NotificationChannel
+  address     String?
+  deviceToken String?
+  platform    String?
+  verifiedAt  DateTime?
+  createdAt   DateTime            @default(now())
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, channel, platform])
+}
+
+model NotificationTemplate {
+  id        String              @id
+  channel   NotificationChannel
+  version   Int                 @default(1)
+  subject   String?
+  body      String
+  variables Json?
+  active    Boolean             @default(true)
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+}
+
+model Notification {
+  id                String             @id
+  userId            String
+  channel           NotificationChannel
+  platform          String?
+  templateId        String
+  payload           Json?
+  legalBasis        LegalBasis
+  region            String             @default("US")
+  status            NotificationStatus @default(queued)
+  provider          String?
+  providerMessageId String?
+  attempts          Int                @default(0)
+  lastError         String?
+  scheduledAt       DateTime?
+  sentAt            DateTime?
+  dedupKey          String             @unique
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+model Consent {
+  id          String              @id @default(cuid())
+  userId      String
+  channel     NotificationChannel
+  type        String
+  legalBasis  LegalBasis
+  optedIn     Boolean             @default(false)
+  consentedAt DateTime?
+  proofHash   String?
+  createdAt   DateTime            @default(now())
+
+  @@unique([userId, channel, type])
+}
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  actor        String
+  action       String
+  resourceType String
+  resourceId   String
+  status       String
+  region       String
+  metadata     Json?
+  createdAt    DateTime @default(now())
+
+  @@index([resourceId])
+}
