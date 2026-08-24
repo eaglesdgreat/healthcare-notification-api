@@ -1,10 +1,10 @@
-import { NotificationChannel } from '@prisma/client';
+import { NotificationChannel } from '../../generated/prisma/enums.js'
 import {
   DeliveryStatus,
   NotificationProvider,
   ProviderPayload,
   ProviderResult,
-} from '../notification-provider.interface';
+} from '../notification-provider.interface.js'
 
 /**
  * Reference implementation of the Apple Push Notification service (iOS push)
@@ -17,19 +17,19 @@ import {
  *  3. Register this provider in `ProvidersModule`.
  */
 export class ApnsProvider implements NotificationProvider {
-  readonly name = 'apns';
+  readonly name = 'apns'
 
   supports(channel: NotificationChannel, platform?: string | null): boolean {
-    return channel === NotificationChannel.push && platform === 'ios';
+    return channel === NotificationChannel.push && platform === 'ios'
   }
 
-  async send(_payload: ProviderPayload): Promise<ProviderResult> {
+  send(_payload: ProviderPayload): Promise<ProviderResult> {
     throw new Error(
       'ApnsProvider is not configured — install apn and wire this provider in ProvidersModule.',
-    );
+    )
   }
 
-  async getDeliveryStatus(providerMessageId: string): Promise<DeliveryStatus> {
-    return { status: 'unknown', providerMessageId };
+  getDeliveryStatus(providerMessageId: string): Promise<DeliveryStatus> {
+    return Promise.resolve({ status: 'unknown', providerMessageId })
   }
 }

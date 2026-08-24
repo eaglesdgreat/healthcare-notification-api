@@ -1,11 +1,11 @@
-import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
-import { AuditModule } from './audit/audit.module';
-import configuration from './config/configuration';
-import { HealthModule } from './health/health.module';
-import { NotificationModule } from './notification/notification.module';
-import { PrismaModule } from './prisma/prisma.module';
-import { QueueModule } from './queue/queue.module';
+import { Module } from '@nestjs/common'
+import { ConfigModule } from '@nestjs/config'
+import { AuditModule } from './audit/audit.module.js'
+import configuration from './config/configuration.js'
+import { HealthModule } from './health/health.module.js'
+import { NotificationModule } from './notification/notification.module.js'
+import { PrismaModule } from './prisma/prisma.module.js'
+import { QueueModule } from './queue/queue.module.js'
 
 @Module({
   imports: [

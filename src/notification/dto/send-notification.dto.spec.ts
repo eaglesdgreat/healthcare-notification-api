@@ -1,7 +1,10 @@
-import { LegalBasis, NotificationChannel } from '@prisma/client'
+import {
+  LegalBasis,
+  NotificationChannel,
+} from '../../generated/prisma/enums.js'
 import { plainToInstance } from 'class-transformer'
 import { validate } from 'class-validator'
-import { SendNotificationDto } from './send-notification.dto'
+import { SendNotificationDto } from './send-notification.dto.js'
 
 describe('SendNotificationDto', () => {
   it('accepts a valid payload', async () => {

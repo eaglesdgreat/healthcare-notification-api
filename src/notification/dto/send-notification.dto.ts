@@ -6,32 +6,36 @@ import {
   IsOptional,
   IsString,
   MaxLength,
-} from 'class-validator';
-import { LegalBasis, NotificationChannel, Prisma } from '@prisma/client';
+} from 'class-validator'
+import type { Prisma } from '../../generated/prisma/client.js'
+import {
+  LegalBasis,
+  NotificationChannel,
+} from '../../generated/prisma/enums.js'
 
 export class SendNotificationDto {
   @IsString()
   @MaxLength(64)
-  userId!: string;
+  userId!: string
 
   @IsEnum(NotificationChannel)
-  channel!: NotificationChannel;
+  channel!: NotificationChannel
 
   @IsOptional()
   @IsIn(['ios', 'android'])
-  platform?: string;
+  platform?: string
 
   @IsString()
   @MaxLength(128)
-  templateId!: string;
+  templateId!: string
 
   @IsObject()
-  payload!: Prisma.InputJsonValue;
+  payload!: Prisma.InputJsonValue
 
   @IsEnum(LegalBasis)
-  legalBasis!: LegalBasis;
+  legalBasis!: LegalBasis
 
   @IsOptional()
   @IsDateString()
-  scheduledAt?: string;
+  scheduledAt?: string
 }

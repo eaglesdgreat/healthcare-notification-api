@@ -8,11 +8,11 @@ import {
   NotFoundException,
   Param,
   Post,
-} from '@nestjs/common';
-import { NotificationStatus } from '@prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
-import { SendNotificationDto } from './dto/send-notification.dto';
-import { NotificationService } from './notification.service';
+} from '@nestjs/common'
+import { NotificationStatus } from '../generated/prisma/enums.js'
+import { PrismaService } from '../prisma/prisma.service.js'
+import { SendNotificationDto } from './dto/send-notification.dto.js'
+import { NotificationService } from './notification.service.js'
 
 @Controller('notifications')
 export class NotificationController {
@@ -28,17 +28,17 @@ export class NotificationController {
     @Headers('idempotency-key') idempotencyKey?: string,
   ): Promise<{ id: string; status: NotificationStatus }> {
     if (!idempotencyKey) {
-      throw new BadRequestException('Idempotency-Key header is required');
+      throw new BadRequestException('Idempotency-Key header is required')
     }
-    return this.notificationService.send(dto, idempotencyKey);
+    return this.notificationService.send(dto, idempotencyKey)
   }
 
   @Get(':id')
   async getStatus(@Param('id') id: string): Promise<{
-    id: string;
-    status: NotificationStatus;
-    attempts: number;
-    providerMessageId: string | null;
+    id: string
+    status: NotificationStatus
+    attempts: number
+    providerMessageId: string | null
   }> {
     const notification = await this.prisma.notification.findUnique({
       where: { id },
@@ -48,10 +48,10 @@ export class NotificationController {
         attempts: true,
         providerMessageId: true,
       },
-    });
+    })
     if (!notification) {
-      throw new NotFoundException('Notification not found');
+      throw new NotFoundException('Notification not found')
     }
-    return notification;
+    return notification
   }
 }

@@ -1,26 +1,26 @@
-import { InjectQueue } from '@nestjs/bullmq';
-import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { InjectQueue } from '@nestjs/bullmq'
+import { Injectable, Logger } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
+import { Prisma } from '../generated/prisma/client.js'
 import {
   NotificationChannel,
   NotificationStatus,
-  Prisma,
-} from '@prisma/client';
-import { Queue } from 'bullmq';
-import { randomUUID } from 'node:crypto';
-import { PrismaService } from '../prisma/prisma.service';
-import { NotificationJobData } from '../queue/notification-job.interface';
-import { QUEUE_NAMES } from '../queue/queue.constants';
-import { SendNotificationDto } from './dto/send-notification.dto';
+} from '../generated/prisma/enums.js'
+import { Queue } from 'bullmq'
+import { randomUUID } from 'node:crypto'
+import { PrismaService } from '../prisma/prisma.service.js'
+import { NotificationJobData } from '../queue/notification-job.interface.js'
+import { QUEUE_NAMES } from '../queue/queue.constants.js'
+import { SendNotificationDto } from './dto/send-notification.dto.js'
 
 export interface SendResult {
-  id: string;
-  status: NotificationStatus;
+  id: string
+  status: NotificationStatus
 }
 
 @Injectable()
 export class NotificationService {
-  private readonly logger = new Logger(NotificationService.name);
+  private readonly logger = new Logger(NotificationService.name)
 
   constructor(
     private readonly prisma: PrismaService,
@@ -41,14 +41,14 @@ export class NotificationService {
   ): Promise<SendResult> {
     const existing = await this.prisma.notification.findUnique({
       where: { dedupKey: idempotencyKey },
-    });
+    })
     if (existing) {
-      return { id: existing.id, status: existing.status };
+      return { id: existing.id, status: existing.status }
     }
 
     // TODO: resolve the user's region from the user directory (multi-region
     // gateway). For now each deployed instance is pinned to its own region.
-    const region = this.config.get<string>('region') ?? 'US';
+    const region = this.config.get<string>('region') ?? 'US'
 
     try {
       const notification = await this.prisma.notification.create({
@@ -66,7 +66,7 @@ export class NotificationService {
           dedupKey: idempotencyKey,
           scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null,
         },
-      });
+      })
 
       await this.queueFor(dto).add(
         'send-notification',
@@ -77,9 +77,9 @@ export class NotificationService {
             ? this.delayUntil(new Date(dto.scheduledAt))
             : undefined,
         },
-      );
+      )
 
-      return { id: notification.id, status: notification.status };
+      return { id: notification.id, status: notification.status }
     } catch (error: unknown) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -87,34 +87,34 @@ export class NotificationService {
       ) {
         const duplicate = await this.prisma.notification.findUnique({
           where: { dedupKey: idempotencyKey },
-        });
+        })
         if (duplicate) {
-          return { id: duplicate.id, status: duplicate.status };
+          return { id: duplicate.id, status: duplicate.status }
         }
       }
       const detail =
-        error instanceof Error ? (error.stack ?? error.message) : String(error);
-      this.logger.error(`Failed to enqueue notification: ${detail}`);
-      throw error;
+        error instanceof Error ? (error.stack ?? error.message) : String(error)
+      this.logger.error(`Failed to enqueue notification: ${detail}`)
+      throw error
     }
   }
 
   private queueFor(dto: SendNotificationDto): Queue<NotificationJobData> {
     switch (dto.channel) {
       case NotificationChannel.email:
-        return this.emailQueue;
+        return this.emailQueue
       case NotificationChannel.sms:
-        return this.smsQueue;
+        return this.smsQueue
       case NotificationChannel.push:
         return dto.platform === 'android'
           ? this.pushAndroidQueue
-          : this.pushIosQueue;
+          : this.pushIosQueue
       default:
-        throw new Error(`Unsupported channel: ${dto.channel}`);
+        throw new Error(`Unsupported channel: ${String(dto.channel)}`)
     }
   }
 
   private delayUntil(date: Date): number {
-    return Math.max(0, date.getTime() - Date.now());
+    return Math.max(0, date.getTime() - Date.now())
   }
 }

@@ -1,6 +1,6 @@
-import { Module } from '@nestjs/common';
-import { ConsoleNotificationProvider } from './console-notification.provider';
-import { ProviderRegistry } from './provider-registry.service';
+import { Module } from '@nestjs/common'
+import { ConsoleNotificationProvider } from './console-notification.provider.js'
+import { ProviderRegistry } from './provider-registry.service.js'
 
 @Module({
   providers: [ProviderRegistry, ConsoleNotificationProvider],
@@ -12,7 +12,7 @@ export class ProvidersModule {
     consoleProvider: ConsoleNotificationProvider,
   ) {
     // Register the console provider as the development default.
-    registry.register(consoleProvider);
+    registry.register(consoleProvider)
 
     // Wire real providers once their SDKs are configured, e.g.:
     // registry.register(new SendGridProvider());
