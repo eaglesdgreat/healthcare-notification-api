@@ -1,10 +1,10 @@
-import { NotificationChannel } from '@prisma/client';
+import { NotificationChannel } from '../../generated/prisma/enums.js'
 import {
   DeliveryStatus,
   NotificationProvider,
   ProviderPayload,
   ProviderResult,
-} from '../notification-provider.interface';
+} from '../notification-provider.interface.js'
 
 /**
  * Reference implementation of the Firebase Cloud Messaging (Android push)
@@ -17,19 +17,19 @@ import {
  *  3. Register this provider in `ProvidersModule`.
  */
 export class FcmProvider implements NotificationProvider {
-  readonly name = 'fcm';
+  readonly name = 'fcm'
 
   supports(channel: NotificationChannel, platform?: string | null): boolean {
-    return channel === NotificationChannel.push && platform === 'android';
+    return channel === NotificationChannel.push && platform === 'android'
   }
 
-  async send(_payload: ProviderPayload): Promise<ProviderResult> {
+  send(_payload: ProviderPayload): Promise<ProviderResult> {
     throw new Error(
       'FcmProvider is not configured — install firebase-admin and wire this provider in ProvidersModule.',
-    );
+    )
   }
 
-  async getDeliveryStatus(providerMessageId: string): Promise<DeliveryStatus> {
-    return { status: 'unknown', providerMessageId };
+  getDeliveryStatus(providerMessageId: string): Promise<DeliveryStatus> {
+    return Promise.resolve({ status: 'unknown', providerMessageId })
   }
 }

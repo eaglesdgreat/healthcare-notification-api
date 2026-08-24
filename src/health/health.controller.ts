@@ -1,11 +1,11 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get } from '@nestjs/common'
 import {
   HealthCheck,
   HealthCheckService,
   MemoryHealthIndicator,
   PrismaHealthIndicator,
-} from '@nestjs/terminus';
-import { PrismaService } from '../prisma/prisma.service';
+} from '@nestjs/terminus'
+import { PrismaService } from '../prisma/prisma.service.js'
 
 @Controller('health')
 export class HealthController {
@@ -21,7 +21,7 @@ export class HealthController {
   live() {
     return this.health.check([
       () => this.memory.checkHeap('memory_heap', 150 * 1024 * 1024),
-    ]);
+    ])
   }
 
   @Get('ready')
@@ -29,6 +29,6 @@ export class HealthController {
   ready() {
     return this.health.check([
       () => this.prismaHealth.pingCheck('database', this.prisma),
-    ]);
+    ])
   }
 }

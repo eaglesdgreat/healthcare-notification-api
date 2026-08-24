@@ -1,26 +1,28 @@
-import { INestApplication } from '@nestjs/common';
-import { Test, TestingModule } from '@nestjs/testing';
-import request from 'supertest';
-import { AppModule } from './../src/app.module';
+import { INestApplication } from '@nestjs/common'
+import { Test, TestingModule } from '@nestjs/testing'
+import type { Server } from 'node:http'
+import request from 'supertest'
+import { AppModule } from './../src/app.module.js'
 
 describe('Notification API (e2e)', () => {
-  let app: INestApplication;
+  let app: INestApplication
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    }).compile()
 
-    app = moduleFixture.createNestApplication();
-    app.setGlobalPrefix('api');
-    await app.init();
-  });
+    app = moduleFixture.createNestApplication()
+    app.setGlobalPrefix('api')
+    await app.init()
+  })
 
   afterAll(async () => {
-    await app.close();
-  });
+    await app.close()
+  })
 
   it('/api/health/live (GET) returns 200', () => {
-    return request(app.getHttpServer()).get('/api/health/live').expect(200);
-  });
-});
+    const server = app.getHttpServer() as Server
+    return request(server).get('/api/health/live').expect(200)
+  })
+})

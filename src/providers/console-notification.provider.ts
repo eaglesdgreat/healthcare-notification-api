@@ -1,12 +1,12 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { NotificationChannel } from '@prisma/client';
-import { randomUUID } from 'node:crypto';
+import { Injectable, Logger } from '@nestjs/common'
+import { NotificationChannel } from '../generated/prisma/enums.js'
+import { randomUUID } from 'node:crypto'
 import {
   DeliveryStatus,
   NotificationProvider,
   ProviderPayload,
   ProviderResult,
-} from './notification-provider.interface';
+} from './notification-provider.interface.js'
 
 /**
  * Fallback provider used for local development — logs the message instead of
@@ -14,24 +14,27 @@ import {
  */
 @Injectable()
 export class ConsoleNotificationProvider implements NotificationProvider {
-  readonly name = 'console';
-  private readonly logger = new Logger(ConsoleNotificationProvider.name);
+  readonly name = 'console'
+  private readonly logger = new Logger(ConsoleNotificationProvider.name)
 
   supports(_channel: NotificationChannel, _platform?: string | null): boolean {
-    return true;
+    return true
   }
 
-  async send(payload: ProviderPayload): Promise<ProviderResult> {
+  send(payload: ProviderPayload): Promise<ProviderResult> {
     const target = payload.platform
       ? `${payload.channel}/${payload.platform}`
-      : payload.channel;
+      : payload.channel
     this.logger.log(
       `[console] Sending ${target} notification to ${payload.recipient} (template: ${payload.templateId}) — ${payload.content.body}`,
-    );
-    return { success: true, providerMessageId: `console_${randomUUID()}` };
+    )
+    return Promise.resolve({
+      success: true,
+      providerMessageId: `console_${randomUUID()}`,
+    })
   }
 
-  async getDeliveryStatus(providerMessageId: string): Promise<DeliveryStatus> {
-    return { status: 'delivered', providerMessageId };
+  getDeliveryStatus(providerMessageId: string): Promise<DeliveryStatus> {
+    return Promise.resolve({ status: 'delivered', providerMessageId })
   }
 }

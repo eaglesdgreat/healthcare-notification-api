@@ -1,15 +1,15 @@
 export interface AppConfig {
-  port: number;
-  nodeEnv: string;
-  region: 'US' | 'EU';
+  port: number
+  nodeEnv: string
+  region: 'US' | 'EU'
   redis: {
-    host: string;
-    port: number;
-    password?: string;
-  };
+    host: string
+    port: number
+    password?: string
+  }
   database: {
-    url: string;
-  };
+    url: string
+  }
 }
 
 export default (): AppConfig => ({
@@ -26,4 +26,4 @@ export default (): AppConfig => ({
       process.env.DATABASE_URL ??
       'postgresql://postgres:postgres@localhost:5432/notification?schema=public',
   },
-});
+})

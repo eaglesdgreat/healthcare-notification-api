@@ -1,23 +1,23 @@
-import { BullModule } from '@nestjs/bullmq';
-import { Module } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { JobsOptions } from 'bullmq';
-import { ProvidersModule } from '../providers/providers.module';
+import { BullModule } from '@nestjs/bullmq'
+import { Module } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
+import { JobsOptions } from 'bullmq'
+import { ProvidersModule } from '../providers/providers.module.js'
 import {
   AndroidPushNotificationProcessor,
   EmailNotificationProcessor,
   IosPushNotificationProcessor,
   SmsNotificationProcessor,
-} from './notification.processor';
-import { NotificationWorkerService } from './notification-worker.service';
-import { QUEUE_NAMES } from './queue.constants';
+} from './notification.processor.js'
+import { NotificationWorkerService } from './notification-worker.service.js'
+import { QUEUE_NAMES } from './queue.constants.js'
 
 const defaultJobOptions: JobsOptions = {
   attempts: 5,
   backoff: { type: 'exponential', delay: 2000 },
   removeOnComplete: 1000,
   removeOnFail: 5000,
-};
+}
 
 @Module({
   imports: [
