@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
-import { NotificationChannel } from '../generated/prisma/enums.js'
-import { NotificationProvider } from './notification-provider.interface.js'
+import { NotificationChannel } from '@/generated/prisma/enums.js'
+import { NotificationProvider } from '@/providers/notification-provider.interface.js'
 
 @Injectable()
 export class ProviderRegistry {

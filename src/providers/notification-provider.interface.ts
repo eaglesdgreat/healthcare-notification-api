@@ -1,4 +1,4 @@
-import { NotificationChannel } from '../generated/prisma/enums.js'
+import { NotificationChannel } from '@/generated/prisma/enums.js'
 
 export interface ProviderPayload {
   channel: NotificationChannel

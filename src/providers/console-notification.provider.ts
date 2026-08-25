@@ -1,12 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common'
-import { NotificationChannel } from '../generated/prisma/enums.js'
+import { NotificationChannel } from '@/generated/prisma/enums.js'
 import { randomUUID } from 'node:crypto'
 import {
   DeliveryStatus,
   NotificationProvider,
   ProviderPayload,
   ProviderResult,
-} from './notification-provider.interface.js'
+} from '@/providers/notification-provider.interface.js'
 
 /**
  * Fallback provider used for local development — logs the message instead of

@@ -1,17 +1,17 @@
 import { InjectQueue } from '@nestjs/bullmq'
 import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { Prisma } from '../generated/prisma/client.js'
+import { Prisma } from '@/generated/prisma/client.js'
 import {
   NotificationChannel,
   NotificationStatus,
-} from '../generated/prisma/enums.js'
+} from '@/generated/prisma/enums.js'
 import { Queue } from 'bullmq'
 import { randomUUID } from 'node:crypto'
-import { PrismaService } from '../prisma/prisma.service.js'
-import { NotificationJobData } from '../queue/notification-job.interface.js'
-import { QUEUE_NAMES } from '../queue/queue.constants.js'
-import { SendNotificationDto } from './dto/send-notification.dto.js'
+import { PrismaService } from '@/prisma/prisma.service.js'
+import { NotificationJobData } from '@/queue/notification-job.interface.js'
+import { QUEUE_NAMES } from '@/queue/queue.constants.js'
+import { SendNotificationDto } from '@/notification/dto/send-notification.dto.js'
 
 export interface SendResult {
   id: string

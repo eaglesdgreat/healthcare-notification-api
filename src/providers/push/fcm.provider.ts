@@ -1,10 +1,10 @@
-import { NotificationChannel } from '../../generated/prisma/enums.js'
+import { NotificationChannel } from '@/generated/prisma/enums.js'
 import {
   DeliveryStatus,
   NotificationProvider,
   ProviderPayload,
   ProviderResult,
-} from '../notification-provider.interface.js'
+} from '@/providers/notification-provider.interface.js'
 
 /**
  * Reference implementation of the Firebase Cloud Messaging (Android push)

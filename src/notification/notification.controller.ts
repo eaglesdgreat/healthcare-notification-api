@@ -9,10 +9,10 @@ import {
   Param,
   Post,
 } from '@nestjs/common'
-import { NotificationStatus } from '../generated/prisma/enums.js'
-import { PrismaService } from '../prisma/prisma.service.js'
-import { SendNotificationDto } from './dto/send-notification.dto.js'
-import { NotificationService } from './notification.service.js'
+import { NotificationStatus } from '@/generated/prisma/enums.js'
+import { PrismaService } from '@/prisma/prisma.service.js'
+import { SendNotificationDto } from '@/notification/dto/send-notification.dto.js'
+import { NotificationService } from '@/notification/notification.service.js'
 
 @Controller('notifications')
 export class NotificationController {
