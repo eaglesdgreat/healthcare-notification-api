@@ -28,16 +28,6 @@ enum LegalBasis {
   legitimate_interest
 }
 
-model User {
-  id        String        @id
-  region    String        @default("US")
-  timezone  String?
-  locale    String?
-  channels  UserChannel[]
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
-}
-
 model UserChannel {
   id          String              @id @default(cuid())
   userId      String
@@ -47,7 +37,6 @@ model UserChannel {
   platform    String?
   verifiedAt  DateTime?
   createdAt   DateTime            @default(now())
-  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, channel, platform])
 }
