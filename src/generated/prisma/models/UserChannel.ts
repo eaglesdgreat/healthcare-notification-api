@@ -206,7 +206,6 @@ export type UserChannelWhereInput = {
   platform?: Prisma.StringNullableFilter<"UserChannel"> | string | null
   verifiedAt?: Prisma.DateTimeNullableFilter<"UserChannel"> | Date | string | null
   createdAt?: Prisma.DateTimeFilter<"UserChannel"> | Date | string
-  user?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
 }
 
 export type UserChannelOrderByWithRelationInput = {
@@ -218,7 +217,6 @@ export type UserChannelOrderByWithRelationInput = {
   platform?: Prisma.SortOrderInput | Prisma.SortOrder
   verifiedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
-  user?: Prisma.UserOrderByWithRelationInput
 }
 
 export type UserChannelWhereUniqueInput = Prisma.AtLeast<{
@@ -234,7 +232,6 @@ export type UserChannelWhereUniqueInput = Prisma.AtLeast<{
   platform?: Prisma.StringNullableFilter<"UserChannel"> | string | null
   verifiedAt?: Prisma.DateTimeNullableFilter<"UserChannel"> | Date | string | null
   createdAt?: Prisma.DateTimeFilter<"UserChannel"> | Date | string
-  user?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
 }, "id" | "userId_channel_platform">
 
 export type UserChannelOrderByWithAggregationInput = {
@@ -267,13 +264,13 @@ export type UserChannelScalarWhereWithAggregatesInput = {
 
 export type UserChannelCreateInput = {
   id?: string
+  userId: string
   channel: $Enums.NotificationChannel
   address?: string | null
   deviceToken?: string | null
   platform?: string | null
   verifiedAt?: Date | string | null
   createdAt?: Date | string
-  user: Prisma.UserCreateNestedOneWithoutChannelsInput
 }
 
 export type UserChannelUncheckedCreateInput = {
@@ -289,13 +286,13 @@ export type UserChannelUncheckedCreateInput = {
 
 export type UserChannelUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
+  userId?: Prisma.StringFieldUpdateOperationsInput | string
   channel?: Prisma.EnumNotificationChannelFieldUpdateOperationsInput | $Enums.NotificationChannel
   address?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deviceToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   platform?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  user?: Prisma.UserUpdateOneRequiredWithoutChannelsNestedInput
 }
 
 export type UserChannelUncheckedUpdateInput = {
@@ -322,6 +319,7 @@ export type UserChannelCreateManyInput = {
 
 export type UserChannelUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
+  userId?: Prisma.StringFieldUpdateOperationsInput | string
   channel?: Prisma.EnumNotificationChannelFieldUpdateOperationsInput | $Enums.NotificationChannel
   address?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deviceToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -339,16 +337,6 @@ export type UserChannelUncheckedUpdateManyInput = {
   platform?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-}
-
-export type UserChannelListRelationFilter = {
-  every?: Prisma.UserChannelWhereInput
-  some?: Prisma.UserChannelWhereInput
-  none?: Prisma.UserChannelWhereInput
-}
-
-export type UserChannelOrderByRelationAggregateInput = {
-  _count?: Prisma.SortOrder
 }
 
 export type UserChannelUserIdChannelPlatformCompoundUniqueInput = {
@@ -390,154 +378,24 @@ export type UserChannelMinOrderByAggregateInput = {
   createdAt?: Prisma.SortOrder
 }
 
-export type UserChannelCreateNestedManyWithoutUserInput = {
-  create?: Prisma.XOR<Prisma.UserChannelCreateWithoutUserInput, Prisma.UserChannelUncheckedCreateWithoutUserInput> | Prisma.UserChannelCreateWithoutUserInput[] | Prisma.UserChannelUncheckedCreateWithoutUserInput[]
-  connectOrCreate?: Prisma.UserChannelCreateOrConnectWithoutUserInput | Prisma.UserChannelCreateOrConnectWithoutUserInput[]
-  createMany?: Prisma.UserChannelCreateManyUserInputEnvelope
-  connect?: Prisma.UserChannelWhereUniqueInput | Prisma.UserChannelWhereUniqueInput[]
-}
-
-export type UserChannelUncheckedCreateNestedManyWithoutUserInput = {
-  create?: Prisma.XOR<Prisma.UserChannelCreateWithoutUserInput, Prisma.UserChannelUncheckedCreateWithoutUserInput> | Prisma.UserChannelCreateWithoutUserInput[] | Prisma.UserChannelUncheckedCreateWithoutUserInput[]
-  connectOrCreate?: Prisma.UserChannelCreateOrConnectWithoutUserInput | Prisma.UserChannelCreateOrConnectWithoutUserInput[]
-  createMany?: Prisma.UserChannelCreateManyUserInputEnvelope
-  connect?: Prisma.UserChannelWhereUniqueInput | Prisma.UserChannelWhereUniqueInput[]
-}
-
-export type UserChannelUpdateManyWithoutUserNestedInput = {
-  create?: Prisma.XOR<Prisma.UserChannelCreateWithoutUserInput, Prisma.UserChannelUncheckedCreateWithoutUserInput> | Prisma.UserChannelCreateWithoutUserInput[] | Prisma.UserChannelUncheckedCreateWithoutUserInput[]
-  connectOrCreate?: Prisma.UserChannelCreateOrConnectWithoutUserInput | Prisma.UserChannelCreateOrConnectWithoutUserInput[]
-  upsert?: Prisma.UserChannelUpsertWithWhereUniqueWithoutUserInput | Prisma.UserChannelUpsertWithWhereUniqueWithoutUserInput[]
-  createMany?: Prisma.UserChannelCreateManyUserInputEnvelope
-  set?: Prisma.UserChannelWhereUniqueInput | Prisma.UserChannelWhereUniqueInput[]
-  disconnect?: Prisma.UserChannelWhereUniqueInput | Prisma.UserChannelWhereUniqueInput[]
-  delete?: Prisma.UserChannelWhereUniqueInput | Prisma.UserChannelWhereUniqueInput[]
-  connect?: Prisma.UserChannelWhereUniqueInput | Prisma.UserChannelWhereUniqueInput[]
-  update?: Prisma.UserChannelUpdateWithWhereUniqueWithoutUserInput | Prisma.UserChannelUpdateWithWhereUniqueWithoutUserInput[]
-  updateMany?: Prisma.UserChannelUpdateManyWithWhereWithoutUserInput | Prisma.UserChannelUpdateManyWithWhereWithoutUserInput[]
-  deleteMany?: Prisma.UserChannelScalarWhereInput | Prisma.UserChannelScalarWhereInput[]
-}
-
-export type UserChannelUncheckedUpdateManyWithoutUserNestedInput = {
-  create?: Prisma.XOR<Prisma.UserChannelCreateWithoutUserInput, Prisma.UserChannelUncheckedCreateWithoutUserInput> | Prisma.UserChannelCreateWithoutUserInput[] | Prisma.UserChannelUncheckedCreateWithoutUserInput[]
-  connectOrCreate?: Prisma.UserChannelCreateOrConnectWithoutUserInput | Prisma.UserChannelCreateOrConnectWithoutUserInput[]
-  upsert?: Prisma.UserChannelUpsertWithWhereUniqueWithoutUserInput | Prisma.UserChannelUpsertWithWhereUniqueWithoutUserInput[]
-  createMany?: Prisma.UserChannelCreateManyUserInputEnvelope
-  set?: Prisma.UserChannelWhereUniqueInput | Prisma.UserChannelWhereUniqueInput[]
-  disconnect?: Prisma.UserChannelWhereUniqueInput | Prisma.UserChannelWhereUniqueInput[]
-  delete?: Prisma.UserChannelWhereUniqueInput | Prisma.UserChannelWhereUniqueInput[]
-  connect?: Prisma.UserChannelWhereUniqueInput | Prisma.UserChannelWhereUniqueInput[]
-  update?: Prisma.UserChannelUpdateWithWhereUniqueWithoutUserInput | Prisma.UserChannelUpdateWithWhereUniqueWithoutUserInput[]
-  updateMany?: Prisma.UserChannelUpdateManyWithWhereWithoutUserInput | Prisma.UserChannelUpdateManyWithWhereWithoutUserInput[]
-  deleteMany?: Prisma.UserChannelScalarWhereInput | Prisma.UserChannelScalarWhereInput[]
+export type StringFieldUpdateOperationsInput = {
+  set?: string
 }
 
 export type EnumNotificationChannelFieldUpdateOperationsInput = {
   set?: $Enums.NotificationChannel
 }
 
+export type NullableStringFieldUpdateOperationsInput = {
+  set?: string | null
+}
+
 export type NullableDateTimeFieldUpdateOperationsInput = {
   set?: Date | string | null
 }
 
-export type UserChannelCreateWithoutUserInput = {
-  id?: string
-  channel: $Enums.NotificationChannel
-  address?: string | null
-  deviceToken?: string | null
-  platform?: string | null
-  verifiedAt?: Date | string | null
-  createdAt?: Date | string
-}
-
-export type UserChannelUncheckedCreateWithoutUserInput = {
-  id?: string
-  channel: $Enums.NotificationChannel
-  address?: string | null
-  deviceToken?: string | null
-  platform?: string | null
-  verifiedAt?: Date | string | null
-  createdAt?: Date | string
-}
-
-export type UserChannelCreateOrConnectWithoutUserInput = {
-  where: Prisma.UserChannelWhereUniqueInput
-  create: Prisma.XOR<Prisma.UserChannelCreateWithoutUserInput, Prisma.UserChannelUncheckedCreateWithoutUserInput>
-}
-
-export type UserChannelCreateManyUserInputEnvelope = {
-  data: Prisma.UserChannelCreateManyUserInput | Prisma.UserChannelCreateManyUserInput[]
-  skipDuplicates?: boolean
-}
-
-export type UserChannelUpsertWithWhereUniqueWithoutUserInput = {
-  where: Prisma.UserChannelWhereUniqueInput
-  update: Prisma.XOR<Prisma.UserChannelUpdateWithoutUserInput, Prisma.UserChannelUncheckedUpdateWithoutUserInput>
-  create: Prisma.XOR<Prisma.UserChannelCreateWithoutUserInput, Prisma.UserChannelUncheckedCreateWithoutUserInput>
-}
-
-export type UserChannelUpdateWithWhereUniqueWithoutUserInput = {
-  where: Prisma.UserChannelWhereUniqueInput
-  data: Prisma.XOR<Prisma.UserChannelUpdateWithoutUserInput, Prisma.UserChannelUncheckedUpdateWithoutUserInput>
-}
-
-export type UserChannelUpdateManyWithWhereWithoutUserInput = {
-  where: Prisma.UserChannelScalarWhereInput
-  data: Prisma.XOR<Prisma.UserChannelUpdateManyMutationInput, Prisma.UserChannelUncheckedUpdateManyWithoutUserInput>
-}
-
-export type UserChannelScalarWhereInput = {
-  AND?: Prisma.UserChannelScalarWhereInput | Prisma.UserChannelScalarWhereInput[]
-  OR?: Prisma.UserChannelScalarWhereInput[]
-  NOT?: Prisma.UserChannelScalarWhereInput | Prisma.UserChannelScalarWhereInput[]
-  id?: Prisma.StringFilter<"UserChannel"> | string
-  userId?: Prisma.StringFilter<"UserChannel"> | string
-  channel?: Prisma.EnumNotificationChannelFilter<"UserChannel"> | $Enums.NotificationChannel
-  address?: Prisma.StringNullableFilter<"UserChannel"> | string | null
-  deviceToken?: Prisma.StringNullableFilter<"UserChannel"> | string | null
-  platform?: Prisma.StringNullableFilter<"UserChannel"> | string | null
-  verifiedAt?: Prisma.DateTimeNullableFilter<"UserChannel"> | Date | string | null
-  createdAt?: Prisma.DateTimeFilter<"UserChannel"> | Date | string
-}
-
-export type UserChannelCreateManyUserInput = {
-  id?: string
-  channel: $Enums.NotificationChannel
-  address?: string | null
-  deviceToken?: string | null
-  platform?: string | null
-  verifiedAt?: Date | string | null
-  createdAt?: Date | string
-}
-
-export type UserChannelUpdateWithoutUserInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
-  channel?: Prisma.EnumNotificationChannelFieldUpdateOperationsInput | $Enums.NotificationChannel
-  address?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  deviceToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  platform?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-}
-
-export type UserChannelUncheckedUpdateWithoutUserInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
-  channel?: Prisma.EnumNotificationChannelFieldUpdateOperationsInput | $Enums.NotificationChannel
-  address?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  deviceToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  platform?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-}
-
-export type UserChannelUncheckedUpdateManyWithoutUserInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
-  channel?: Prisma.EnumNotificationChannelFieldUpdateOperationsInput | $Enums.NotificationChannel
-  address?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  deviceToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  platform?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+export type DateTimeFieldUpdateOperationsInput = {
+  set?: Date | string
 }
 
 
@@ -551,7 +409,6 @@ export type UserChannelSelect<ExtArgs extends runtime.Types.Extensions.InternalA
   platform?: boolean
   verifiedAt?: boolean
   createdAt?: boolean
-  user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["userChannel"]>
 
 export type UserChannelSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -563,7 +420,6 @@ export type UserChannelSelectCreateManyAndReturn<ExtArgs extends runtime.Types.E
   platform?: boolean
   verifiedAt?: boolean
   createdAt?: boolean
-  user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["userChannel"]>
 
 export type UserChannelSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -575,7 +431,6 @@ export type UserChannelSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.E
   platform?: boolean
   verifiedAt?: boolean
   createdAt?: boolean
-  user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["userChannel"]>
 
 export type UserChannelSelectScalar = {
@@ -590,21 +445,10 @@ export type UserChannelSelectScalar = {
 }
 
 export type UserChannelOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "userId" | "channel" | "address" | "deviceToken" | "platform" | "verifiedAt" | "createdAt", ExtArgs["result"]["userChannel"]>
-export type UserChannelInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}
-export type UserChannelIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}
-export type UserChannelIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}
 
 export type $UserChannelPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "UserChannel"
-  objects: {
-    user: Prisma.$UserPayload<ExtArgs>
-  }
+  objects: {}
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
     userId: string
@@ -1008,7 +852,6 @@ readonly fields: UserChannelFieldRefs;
  */
 export interface Prisma__UserChannelClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
-  user<T extends Prisma.UserDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.UserDefaultArgs<ExtArgs>>): Prisma.Prisma__UserClient<runtime.Types.Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1063,10 +906,6 @@ export type UserChannelFindUniqueArgs<ExtArgs extends runtime.Types.Extensions.I
    */
   omit?: Prisma.UserChannelOmit<ExtArgs> | null
   /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.UserChannelInclude<ExtArgs> | null
-  /**
    * Filter, which UserChannel to fetch.
    */
   where: Prisma.UserChannelWhereUniqueInput
@@ -1085,10 +924,6 @@ export type UserChannelFindUniqueOrThrowArgs<ExtArgs extends runtime.Types.Exten
    */
   omit?: Prisma.UserChannelOmit<ExtArgs> | null
   /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.UserChannelInclude<ExtArgs> | null
-  /**
    * Filter, which UserChannel to fetch.
    */
   where: Prisma.UserChannelWhereUniqueInput
@@ -1106,10 +941,6 @@ export type UserChannelFindFirstArgs<ExtArgs extends runtime.Types.Extensions.In
    * Omit specific fields from the UserChannel
    */
   omit?: Prisma.UserChannelOmit<ExtArgs> | null
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.UserChannelInclude<ExtArgs> | null
   /**
    * Filter, which UserChannel to fetch.
    */
@@ -1159,10 +990,6 @@ export type UserChannelFindFirstOrThrowArgs<ExtArgs extends runtime.Types.Extens
    */
   omit?: Prisma.UserChannelOmit<ExtArgs> | null
   /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.UserChannelInclude<ExtArgs> | null
-  /**
    * Filter, which UserChannel to fetch.
    */
   where?: Prisma.UserChannelWhereInput
@@ -1210,10 +1037,6 @@ export type UserChannelFindManyArgs<ExtArgs extends runtime.Types.Extensions.Int
    * Omit specific fields from the UserChannel
    */
   omit?: Prisma.UserChannelOmit<ExtArgs> | null
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.UserChannelInclude<ExtArgs> | null
   /**
    * Filter, which UserChannels to fetch.
    */
@@ -1263,10 +1086,6 @@ export type UserChannelCreateArgs<ExtArgs extends runtime.Types.Extensions.Inter
    */
   omit?: Prisma.UserChannelOmit<ExtArgs> | null
   /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.UserChannelInclude<ExtArgs> | null
-  /**
    * The data needed to create a UserChannel.
    */
   data: Prisma.XOR<Prisma.UserChannelCreateInput, Prisma.UserChannelUncheckedCreateInput>
@@ -1300,10 +1119,6 @@ export type UserChannelCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Ext
    */
   data: Prisma.UserChannelCreateManyInput | Prisma.UserChannelCreateManyInput[]
   skipDuplicates?: boolean
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.UserChannelIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1318,10 +1133,6 @@ export type UserChannelUpdateArgs<ExtArgs extends runtime.Types.Extensions.Inter
    * Omit specific fields from the UserChannel
    */
   omit?: Prisma.UserChannelOmit<ExtArgs> | null
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.UserChannelInclude<ExtArgs> | null
   /**
    * The data needed to update a UserChannel.
    */
@@ -1374,10 +1185,6 @@ export type UserChannelUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Ext
    * Limit how many UserChannels to update.
    */
   limit?: number
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.UserChannelIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1392,10 +1199,6 @@ export type UserChannelUpsertArgs<ExtArgs extends runtime.Types.Extensions.Inter
    * Omit specific fields from the UserChannel
    */
   omit?: Prisma.UserChannelOmit<ExtArgs> | null
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.UserChannelInclude<ExtArgs> | null
   /**
    * The filter to search for the UserChannel to update in case it exists.
    */
@@ -1422,10 +1225,6 @@ export type UserChannelDeleteArgs<ExtArgs extends runtime.Types.Extensions.Inter
    * Omit specific fields from the UserChannel
    */
   omit?: Prisma.UserChannelOmit<ExtArgs> | null
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.UserChannelInclude<ExtArgs> | null
   /**
    * Filter which UserChannel to delete.
    */
@@ -1458,8 +1257,4 @@ export type UserChannelDefaultArgs<ExtArgs extends runtime.Types.Extensions.Inte
    * Omit specific fields from the UserChannel
    */
   omit?: Prisma.UserChannelOmit<ExtArgs> | null
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.UserChannelInclude<ExtArgs> | null
 }

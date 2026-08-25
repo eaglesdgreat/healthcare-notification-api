@@ -1,34 +1,63 @@
 services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: notification-postgres
+  ms-notification-api:
+    container_name: ms-notification-api
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.http.routers.ms-notification-api.rule=PathPrefix(`/notifications`)'
+    user: root
+    build:
+      context: .
+      target: base # Targets the first stage of the Dockerfile for dev
+    volumes:
+      - ./:/app:cached
+      # The "Volume Trick": prevents local node_modules from overwriting container ones
+      - /app/node_modules
+    ports:
+      - 5502:5502
+    env_file:
+      - ./.env
+    links:
+      - ms-notification-db
+      - ms-notification-redis
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: notification
-    ports:
-      - '5432:5432'
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U postgres']
-      interval: 5s
-      timeout: 5s
-      retries: 5
+      - NODE_ENV=dev
+      - PORT=5502
+      # Override localhost values so the app reaches the containers on the compose network
+      - DATABASE_URL=postgresql://postgres:postgres@ms-notification-db:5432/healthcare_notification_db?schema=public
+      - REDIS_HOST=ms-notification-redis
+      - REDIS_PORT=6379
+      # Use polling for file-watchers (helps on Windows hosts with Docker bind mounts)
+      - CHOKIDAR_USEPOLLING=true
+      - CHOKIDAR_INTERVAL=1000
+      - WATCHPACK_POLLING=true
+      # TypeScript's watch mode does NOT respect CHOKIDAR_USEPOLLING.
+      # Force polling for Windows Docker bind mounts.
+      - TSC_WATCHFILE=DynamicPriorityPolling
+    # Wait for DB and Redis to be ready before running migrations + Nest
+    command: >
+      sh -c "./shell/wait-for.sh ms-notification-db:5432 -- ./shell/wait-for.sh ms-notification-redis:6379 -- sh ./shell/start-dev.sh"
 
-  redis:
-    image: redis:7-alpine
-    container_name: notification-redis
+  ms-notification-db:
+    container_name: ms-notification-db
+    image: postgres:16-alpine
     ports:
-      - '6379:6379'
+      - 5406:5432
+    expose:
+      - 5432
+    env_file:
+      - ./.env
     volumes:
-      - redisdata:/data
-    healthcheck:
-      test: ['CMD', 'redis-cli', 'ping']
-      interval: 5s
-      timeout: 5s
-      retries: 5
+      - ms-notification-db_vol:/var/lib/postgresql/data
+    restart: always
+
+  ms-notification-redis:
+    container_name: ms-notification-redis
+    image: redis:7-alpine
+    ports:
+      - 5407:6379
+    expose:
+      - 6379
+    restart: always
 
 volumes:
-  pgdata:
-  redisdata:
+  ms-notification-db_vol:
