@@ -1,5 +1,5 @@
 import { Global, Module } from '@nestjs/common'
-import { AuditService } from './audit.service.js'
+import { AuditService } from '@/audit/audit.service.js'
 
 @Global()
 @Module({

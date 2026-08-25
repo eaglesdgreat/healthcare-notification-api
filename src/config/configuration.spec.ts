@@ -1,4 +1,4 @@
-import configuration from './configuration.js'
+import configuration from '@/config/configuration.js'
 
 describe('configuration', () => {
   it('returns defaults when no env vars are set', () => {

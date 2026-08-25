@@ -2,15 +2,15 @@ import { BullModule } from '@nestjs/bullmq'
 import { Module } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { JobsOptions } from 'bullmq'
-import { ProvidersModule } from '../providers/providers.module.js'
+import { ProvidersModule } from '@/providers/providers.module.js'
 import {
   AndroidPushNotificationProcessor,
   EmailNotificationProcessor,
   IosPushNotificationProcessor,
   SmsNotificationProcessor,
-} from './notification.processor.js'
-import { NotificationWorkerService } from './notification-worker.service.js'
-import { QUEUE_NAMES } from './queue.constants.js'
+} from '@/queue/notification.processor.js'
+import { NotificationWorkerService } from '@/queue/notification-worker.service.js'
+import { QUEUE_NAMES } from '@/queue/queue.constants.js'
 
 const defaultJobOptions: JobsOptions = {
   attempts: 5,

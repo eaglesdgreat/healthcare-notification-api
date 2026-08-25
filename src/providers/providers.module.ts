@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common'
-import { ConsoleNotificationProvider } from './console-notification.provider.js'
-import { ProviderRegistry } from './provider-registry.service.js'
+import { ConsoleNotificationProvider } from '@/providers/console-notification.provider.js'
+import { ProviderRegistry } from '@/providers/provider-registry.service.js'
 
 @Module({
   providers: [ProviderRegistry, ConsoleNotificationProvider],

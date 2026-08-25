@@ -5,6 +5,8 @@
   "testRegex": ".e2e-spec.ts$",
   "extensionsToTreatAsEsm": [".ts"],
   "moduleNameMapper": {
+    "^@/(.*)\\.js$": "../src/$1",
+    "^@/(.*)$": "../src/$1",
     "^(\\.{1,2}/.*)\\.js$": "$1"
   },
   "transform": {

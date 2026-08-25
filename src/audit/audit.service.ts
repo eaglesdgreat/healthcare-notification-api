@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common'
-import type { Prisma } from '../generated/prisma/client.js'
-import { PrismaService } from '../prisma/prisma.service.js'
+import type { Prisma } from '@/generated/prisma/client.js'
+import { PrismaService } from '@/prisma/prisma.service.js'
 
 export interface AuditEntry {
   actor: string

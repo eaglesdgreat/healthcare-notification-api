@@ -7,11 +7,8 @@ import {
   IsString,
   MaxLength,
 } from 'class-validator'
-import type { Prisma } from '../../generated/prisma/client.js'
-import {
-  LegalBasis,
-  NotificationChannel,
-} from '../../generated/prisma/enums.js'
+import type { Prisma } from '@/generated/prisma/client.js'
+import { LegalBasis, NotificationChannel } from '@/generated/prisma/enums.js'
 
 export class SendNotificationDto {
   @IsString()

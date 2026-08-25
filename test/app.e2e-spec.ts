@@ -2,7 +2,7 @@ import { INestApplication } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
 import type { Server } from 'node:http'
 import request from 'supertest'
-import { AppModule } from './../src/app.module.js'
+import { AppModule } from '@/app.module.js'
 
 describe('Notification API (e2e)', () => {
   let app: INestApplication

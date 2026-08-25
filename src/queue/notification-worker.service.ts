@@ -2,11 +2,11 @@ import { Injectable, Logger } from '@nestjs/common'
 import {
   NotificationChannel,
   NotificationStatus,
-} from '../generated/prisma/enums.js'
-import { AuditService } from '../audit/audit.service.js'
-import { PrismaService } from '../prisma/prisma.service.js'
-import { ProviderPayload } from '../providers/notification-provider.interface.js'
-import { ProviderRegistry } from '../providers/provider-registry.service.js'
+} from '@/generated/prisma/enums.js'
+import { AuditService } from '@/audit/audit.service.js'
+import { PrismaService } from '@/prisma/prisma.service.js'
+import { ProviderPayload } from '@/providers/notification-provider.interface.js'
+import { ProviderRegistry } from '@/providers/provider-registry.service.js'
 
 @Injectable()
 export class NotificationWorkerService {
