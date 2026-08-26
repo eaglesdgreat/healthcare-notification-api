@@ -29,9 +29,11 @@ RUN pnpm install --frozen-lockfile
 # Copy the rest of the source code
 COPY . .
 
-# Placeholder DB URL so `prisma generate` (which loads prisma.config.ts) can run.
-# The real connection string is injected at runtime via docker-compose / CI.
-ENV DATABASE_URL=postgresql://postgres:postgres@localhost:5432/healthcare_notification_db
+# DATABASE_URL is required at build time only for `prisma generate`
+# (prisma.config.ts reads it). Pass a real value via --build-arg in CI;
+# the default below is a harmless local placeholder.
+ARG DATABASE_URL=postgresql://postgres:postgres@localhost:5432/healthcare_notification_db
+ENV DATABASE_URL=$DATABASE_URL
 
 # Ensure shell scripts have correct permissions
 RUN chmod +x ./shell/*.sh
