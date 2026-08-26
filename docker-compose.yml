@@ -23,7 +23,7 @@ services:
       - NODE_ENV=dev
       - PORT=5502
       # Override localhost values so the app reaches the containers on the compose network
-      - DATABASE_URL=postgresql://postgres:postgres@ms-notification-db:5432/healthcare_notification_db?schema=public
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@ms-notification-db:5432/${POSTGRES_DB}?schema=public
       - REDIS_HOST=ms-notification-redis
       - REDIS_PORT=6379
       # Use polling for file-watchers (helps on Windows hosts with Docker bind mounts)
