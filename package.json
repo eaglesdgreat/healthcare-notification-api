@@ -1,6 +1,7 @@
 {
   "name": "healthcare-notification-api",
   "version": "0.0.1",
+  "packageManager": "pnpm@11.20.0",
   "description": "Healthcare notification service (email, SMS, push) — HIPAA + GDPR aware, multi-region.",
   "author": "",
   "private": true,
