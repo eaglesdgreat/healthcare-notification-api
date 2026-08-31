@@ -86,19 +86,35 @@ psql:
 	docker-compose -p ${project} exec ${service}-db psql -U postgres -d healthcare_notification_db
 
 .PHONY: test
-test: start test-exec
+test: start test-exec test-e2e test-integration
 
 .PHONY: test-exec
 test-exec:
 	docker-compose -p ${project} exec ${service}-api pnpm test -- --exit
 
-.PHONY: lint-fix
-lint-fix: start
-	docker-compose -p ${project} exec ${service}-api pnpm lint:fix
+.PHONY: test-e2e
+test-e2e:
+	docker-compose -p ${project} exec ${service}-api pnpm test:e2e -- --exit
+
+.PHONY: test-integration
+test-integration:
+	docker-compose -p ${project} exec ${service}-api pnpm test:integration
 
 .PHONY: test-cov
 test-cov:
-	docker-compose -p ${project} exec ${service}-api pnpm test-cov
+	docker-compose -p ${project} exec ${service}-api pnpm test:cov
+
+.PHONY: test-watch
+test-watch:
+	docker-compose -p ${project} exec ${service}-api pnpm test:watch
+
+.PHONY: test-debug
+test-debug:
+	docker-compose -p ${project} exec ${service}-api pnpm test:debug
+
+.PHONY: lint-fix
+lint-fix: start
+	docker-compose -p ${project} exec ${service}-api pnpm lint:fix
 
 .PHONY: commit-hash
 commit-hash:
