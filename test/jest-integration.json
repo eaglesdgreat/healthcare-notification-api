@@ -5,8 +5,8 @@
   "testRegex": ".integration.spec.ts$",
   "extensionsToTreatAsEsm": [".ts"],
   "moduleNameMapper": {
-    "^@/(.*)\\.js$": "../src/$1",
-    "^@/(.*)$": "../src/$1",
+    "^@/(.*)\\.js$": "<rootDir>/src/$1",
+    "^@/(.*)$": "<rootDir>/src/$1",
     "^(\\.{1,2}/.*)\\.js$": "$1"
   },
   "transform": {
