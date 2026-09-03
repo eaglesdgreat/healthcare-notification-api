@@ -12,6 +12,7 @@ import { PrismaService } from '@/prisma/prisma.service.js'
 import { NotificationJobData } from '@/queue/notification-job.interface.js'
 import { QUEUE_NAMES } from '@/queue/queue.constants.js'
 import { SendNotificationDto } from '@/notification/dto/send-notification.dto.js'
+import { UnsupportedChannelException } from '@/common/exceptions/notification.exceptions.js'
 
 export interface SendResult {
   id: string
@@ -110,7 +111,7 @@ export class NotificationService {
           ? this.pushAndroidQueue
           : this.pushIosQueue
       default:
-        throw new Error(`Unsupported channel: ${String(dto.channel)}`)
+        throw new UnsupportedChannelException(String(dto.channel))
     }
   }
 

@@ -6,6 +6,10 @@ import {
 import { AuditService } from '@/audit/audit.service.js'
 import { PrismaService } from '@/prisma/prisma.service.js'
 import { ProviderRegistry } from '@/providers/provider-registry.service.js'
+import {
+  ProviderUnavailableException,
+  RecipientNotFoundException,
+} from '@/common/exceptions/notification.exceptions.js'
 import { NotificationWorkerService } from '@/queue/notification-worker.service.js'
 
 describe('NotificationWorkerService', () => {
@@ -49,6 +53,7 @@ describe('NotificationWorkerService', () => {
     await expect(service.process('missing-id')).rejects.toThrow(
       'Notification missing-id not found',
     )
+    expect(prisma.notification.update).not.toHaveBeenCalled()
   })
 
   it('skips processing when the notification already sent', async () => {
@@ -167,13 +172,66 @@ describe('NotificationWorkerService', () => {
     prisma.userChannel.findFirst.mockResolvedValue({ address: '+15551230000' })
 
     await expect(service.process('ntf_456')).rejects.toThrow(
-      'Provider unavailable',
+      'Provider "console" failed to deliver: Provider unavailable',
     )
     expect(prisma.notification.update).toHaveBeenLastCalledWith({
       where: { id: 'ntf_456' },
       data: {
         attempts: { increment: 1 },
         lastError: 'Provider unavailable',
+      },
+    })
+  })
+
+  it('marks the notification failed and throws when no provider supports the channel', async () => {
+    prisma.notification.findUnique.mockResolvedValue({
+      id: 'ntf_789',
+      userId: 'user-3',
+      channel: NotificationChannel.push,
+      platform: 'android',
+      templateId: 'tpl-push',
+      payload: {},
+      status: NotificationStatus.queued,
+      region: 'US',
+    })
+    providers.resolve.mockReturnValue(undefined)
+
+    await expect(service.process('ntf_789')).rejects.toThrow(
+      ProviderUnavailableException,
+    )
+    expect(prisma.notification.update).toHaveBeenLastCalledWith({
+      where: { id: 'ntf_789' },
+      data: {
+        attempts: { increment: 1 },
+        lastError: 'No provider configured for channel=push',
+      },
+    })
+  })
+
+  it('marks the notification failed and throws when the recipient cannot be resolved', async () => {
+    const provider = { name: 'console', send: jest.fn() }
+    prisma.notification.findUnique.mockResolvedValue({
+      id: 'ntf_999',
+      userId: 'user-4',
+      channel: NotificationChannel.email,
+      platform: null,
+      templateId: 'tpl-reminder',
+      payload: {},
+      status: NotificationStatus.queued,
+      region: 'US',
+    })
+    providers.resolve.mockReturnValue(provider)
+    prisma.userChannel.findFirst.mockResolvedValue(null)
+
+    await expect(service.process('ntf_999')).rejects.toThrow(
+      RecipientNotFoundException,
+    )
+    expect(provider.send).not.toHaveBeenCalled()
+    expect(prisma.notification.update).toHaveBeenLastCalledWith({
+      where: { id: 'ntf_999' },
+      data: {
+        attempts: { increment: 1 },
+        lastError: 'No contact channel found for user=user-4 channel=email',
       },
     })
   })

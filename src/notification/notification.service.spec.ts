@@ -189,4 +189,20 @@ describe('NotificationService', () => {
       status: NotificationStatus.duplicate,
     })
   })
+
+  it('throws UnsupportedChannelException for an unrecognized channel', async () => {
+    const unsupportedDto = {
+      ...dto,
+      channel: 'carrier-pigeon' as NotificationChannel,
+    }
+    prisma.notification.findUnique.mockResolvedValue(null)
+    prisma.notification.create.mockResolvedValue({
+      id: 'ntf_unsupported',
+      status: NotificationStatus.queued,
+    })
+
+    await expect(
+      service.send(unsupportedDto, 'idem-unsupported'),
+    ).rejects.toThrow('Unsupported channel: carrier-pigeon')
+  })
 })

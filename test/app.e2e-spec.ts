@@ -13,6 +13,8 @@ import { NotificationController } from '@/notification/notification.controller.j
 import { NotificationService } from '@/notification/notification.service.js'
 import { NotificationStatus } from '@/generated/prisma/enums.js'
 import { PrismaService } from '@/prisma/prisma.service.js'
+import { GlobalExceptionFilter } from '@/common/filters/global-exception.filter.js'
+import { RequestValidationException } from '@/common/exceptions/notification.exceptions.js'
 
 describe('Notification API (e2e)', () => {
   let app: INestApplication
@@ -80,11 +82,16 @@ describe('Notification API (e2e)', () => {
 
     app = moduleFixture.createNestApplication()
     app.setGlobalPrefix('api')
+    app.useGlobalFilters(new GlobalExceptionFilter())
     app.useGlobalPipes(
       new ValidationPipe({
         whitelist: true,
         forbidNonWhitelisted: true,
         transform: true,
+        exceptionFactory: (errors) =>
+          new RequestValidationException(
+            errors.flatMap((error) => Object.values(error.constraints ?? {})),
+          ),
       }),
     )
     await app.init()
@@ -116,6 +123,50 @@ describe('Notification API (e2e)', () => {
         legalBasis: 'treatment',
       })
       .expect(400)
+      .expect((res) => {
+        const body = res.body as {
+          statusCode: number
+          errorCode: string
+          path: string
+          method: string
+          requestId: string
+        }
+        expect(body).toMatchObject({
+          statusCode: 400,
+          errorCode: 'IDEMPOTENCY_KEY_REQUIRED',
+          path: '/api/notifications',
+          method: 'POST',
+        })
+        expect(body.requestId).toEqual(expect.any(String))
+      })
+  })
+
+  it('/api/notifications (POST) rejects invalid payloads with a normalized validation error body', () => {
+    const server = app.getHttpServer() as Server
+    return request(server)
+      .post('/api/notifications')
+      .set('Idempotency-Key', 'idem-invalid')
+      .send({
+        userId: 'user-1',
+        channel: 'not-a-channel',
+        payload: { appointment: '2026-09-10' },
+        legalBasis: 'treatment',
+      })
+      .expect(400)
+      .expect((res) => {
+        const body = res.body as {
+          statusCode: number
+          errorCode: string
+          message: string | string[]
+        }
+        expect(body).toMatchObject({
+          statusCode: 400,
+          errorCode: 'VALIDATION_FAILED',
+        })
+        expect(
+          Array.isArray(body.message) || typeof body.message === 'string',
+        ).toBe(true)
+      })
   })
 
   it('/api/notifications (POST) accepts valid payloads with the idempotency header', () => {
@@ -150,6 +201,22 @@ describe('Notification API (e2e)', () => {
           status: NotificationStatus.sent,
           attempts: 1,
           providerMessageId: 'provider-1',
+        })
+      })
+  })
+
+  it('/api/notifications/:id (GET) returns a normalized 404 error body when not found', () => {
+    prisma.notification.findUnique.mockResolvedValueOnce(null as never)
+    const server = app.getHttpServer() as Server
+    return request(server)
+      .get('/api/notifications/does-not-exist')
+      .expect(404)
+      .expect(({ body }) => {
+        expect(body).toMatchObject({
+          statusCode: 404,
+          errorCode: 'NOTIFICATION_NOT_FOUND',
+          path: '/api/notifications/does-not-exist',
+          method: 'GET',
         })
       })
   })
