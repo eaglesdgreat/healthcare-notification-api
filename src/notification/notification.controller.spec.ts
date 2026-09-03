@@ -1,7 +1,10 @@
 import { jest } from '@jest/globals'
-import { BadRequestException, NotFoundException } from '@nestjs/common'
 import { NotificationStatus } from '@/generated/prisma/enums.js'
 import { PrismaService } from '@/prisma/prisma.service.js'
+import {
+  IdempotencyKeyRequiredException,
+  NotificationNotFoundException,
+} from '@/common/exceptions/notification.exceptions.js'
 import { NotificationController } from '@/notification/notification.controller.js'
 import { SendNotificationDto } from '@/notification/dto/send-notification.dto.js'
 import { NotificationService } from '@/notification/notification.service.js'
@@ -37,7 +40,7 @@ describe('NotificationController', () => {
       legalBasis: 'treatment',
     }
 
-    expect(() => controller.send(dto)).toThrow(BadRequestException)
+    expect(() => controller.send(dto)).toThrow(IdempotencyKeyRequiredException)
     expect(notificationService.send).not.toHaveBeenCalled()
   })
 
@@ -83,7 +86,7 @@ describe('NotificationController', () => {
     prisma.notification.findUnique.mockResolvedValue(null)
 
     await expect(controller.getStatus('missing-id')).rejects.toThrow(
-      NotFoundException,
+      NotificationNotFoundException,
     )
   })
 })
