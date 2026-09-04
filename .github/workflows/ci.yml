@@ -164,5 +164,78 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run Prisma DB migrations
+        run: pnpm exec prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
       - name: Build release Docker image
-        run: docker build --build-arg DATABASE_URL="${{ secrets.DATABASE_URL }}" --target release -t local/ms-notification:${{ github.sha }} .
+        run: >
+          docker build 
+          --build-arg DATABASE_URL="${{ secrets.DATABASE_URL }}" 
+          --target release 
+          -t local/ms-notification:${{ github.sha }} .
+
+      - name: Run container DB smoke test
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          PORT: 5502
+        run: |
+          # 1. Run the container in detached mode using host networking
+          container_id=$(docker run --detach --rm --network host \
+            -e DATABASE_URL="$DATABASE_URL" \
+            -e JWT_SECRET="$JWT_SECRET" \
+            -e PORT=$PORT \
+            local/ms-notification:${{ github.sha }})
+
+          # Ensure the container stops even if subsequent steps fail
+          trap "docker stop $container_id" EXIT
+
+          # 2. Poll until the container and server are responsive
+          echo "Waiting for ms-notification container to boot on port $PORT..."
+          app_ready=false
+          for i in {1..30}; do
+            if curl -sSf "http://127.0.0.1:${PORT}/" >/dev/null 2>&1; then
+              echo "App server is responding on port $PORT"
+              app_ready=true
+              break
+            fi
+            echo "Waiting for app... ($i/30)"
+            sleep 2
+          done
+
+          if [ "$app_ready" != "true" ]; then
+            echo "Error: Release container failed to start in time. Container logs:"
+            docker logs "$container_id"
+            exit 1
+          fi
+
+          # 3. DB connection verification (e.g. hitting health/readiness endpoint)
+          echo "Verifying database connection via health check..."
+          status=$(curl -s -o /tmp/health.json -w '%{http_code}' "http://127.0.0.1:${PORT}/health")
+          cat /tmp/health.json || true
+          echo ""
+
+          if [ "$status" != "200" ]; then
+            echo "Smoke test failed: /health returned HTTP $status. Logs:"
+            docker logs "$container_id"
+            exit 1
+          fi
+
+          echo "Container smoke test passed successfully."
