@@ -7,6 +7,12 @@ import { AuditService } from '@/audit/audit.service.js'
 import { PrismaService } from '@/prisma/prisma.service.js'
 import { ProviderPayload } from '@/providers/notification-provider.interface.js'
 import { ProviderRegistry } from '@/providers/provider-registry.service.js'
+import {
+  NotificationNotFoundException,
+  ProviderDeliveryFailedException,
+  ProviderUnavailableException,
+  RecipientNotFoundException,
+} from '@/common/exceptions/notification.exceptions.js'
 
 @Injectable()
 export class NotificationWorkerService {
@@ -23,7 +29,7 @@ export class NotificationWorkerService {
       where: { id: notificationId },
     })
     if (!notification) {
-      throw new Error(`Notification ${notificationId} not found`)
+      throw new NotificationNotFoundException(notificationId)
     }
     if (notification.status === NotificationStatus.sent) {
       this.logger.warn(`Notification ${notificationId} already sent — skipping`)
@@ -40,15 +46,29 @@ export class NotificationWorkerService {
       notification.platform,
     )
     if (!provider) {
-      throw new Error(
-        `No provider configured for channel=${notification.channel} platform=${notification.platform ?? 'none'}`,
+      await this.markFailed(
+        notificationId,
+        `No provider configured for channel=${notification.channel}`,
+      )
+      throw new ProviderUnavailableException(
+        notification.channel,
+        notification.platform,
       )
     }
 
-    const recipient = await this.resolveRecipient(
-      notification.userId,
-      notification.channel,
-    )
+    let recipient: string
+    try {
+      recipient = await this.resolveRecipient(
+        notification.userId,
+        notification.channel,
+      )
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Recipient resolution failed'
+      await this.markFailed(notificationId, message)
+      throw error
+    }
+
     const payload: ProviderPayload = {
       channel: notification.channel,
       platform: notification.platform,
@@ -88,15 +108,23 @@ export class NotificationWorkerService {
       return
     }
 
+    const reason = result.error ?? 'Unknown provider error'
+    await this.markFailed(notificationId, reason)
+    // Throwing triggers BullMQ retry with exponential backoff (see queue.module.ts).
+    throw new ProviderDeliveryFailedException(provider.name, reason)
+  }
+
+  private async markFailed(
+    notificationId: string,
+    reason: string,
+  ): Promise<void> {
     await this.prisma.notification.update({
       where: { id: notificationId },
       data: {
         attempts: { increment: 1 },
-        lastError: result.error ?? 'Unknown provider error',
+        lastError: reason,
       },
     })
-    // Throwing triggers BullMQ retry with exponential backoff (see queue.module.ts).
-    throw new Error(result.error ?? 'Provider send failed')
   }
 
   private async resolveRecipient(
@@ -108,9 +136,7 @@ export class NotificationWorkerService {
       orderBy: { createdAt: 'desc' },
     })
     if (!userChannel) {
-      throw new Error(
-        `No contact channel found for user=${userId} channel=${channel}`,
-      )
+      throw new RecipientNotFoundException(userId, channel)
     }
     return userChannel.address ?? userChannel.deviceToken ?? ''
   }

@@ -1,4 +1,5 @@
 import { Controller, Get } from '@nestjs/common'
+import { ApiOperation, ApiTags } from '@nestjs/swagger'
 import {
   HealthCheck,
   HealthCheckService,
@@ -7,6 +8,7 @@ import {
 } from '@nestjs/terminus'
 import { PrismaService } from '@/prisma/prisma.service.js'
 
+@ApiTags('health')
 @Controller('health')
 export class HealthController {
   constructor(
@@ -18,6 +20,7 @@ export class HealthController {
 
   @Get('live')
   @HealthCheck()
+  @ApiOperation({ summary: 'Liveness probe — process is up and responsive.' })
   live() {
     return this.health.check([
       () => this.memory.checkHeap('memory_heap', 150 * 1024 * 1024),
@@ -26,6 +29,9 @@ export class HealthController {
 
   @Get('ready')
   @HealthCheck()
+  @ApiOperation({
+    summary: 'Readiness probe — dependencies (database) are reachable.',
+  })
   ready() {
     return this.health.check([
       () => this.prismaHealth.pingCheck('database', this.prisma),
