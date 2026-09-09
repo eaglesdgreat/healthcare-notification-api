@@ -111,14 +111,14 @@ with **HIPAA + GDPR** compliance across **US and EU** regions.
 
 ## 5. Data Model (per-region Postgres)
 
-| Entity | Key fields |
-| --- | --- |
-| `User` | `id`, `region` (US/EU), `timezone`, `locale` |
-| `UserChannel` | `userId`, `channel` (email/sms/push), `address`/`phone`, `deviceToken`, `platform` (ios/android), `verifiedAt` |
-| `NotificationTemplate` | `id`, `channel`, `version`, `subject`/`body`, `variables`, `active` |
-| `Notification` | `id`, `userId`, `channel`, `platform`, `templateId`, `payload`, `legalBasis`, `region`, `status`, `provider`, `providerMessageId`, `attempts`, `lastError`, `scheduledAt`, `sentAt`, `dedupKey` (**unique**) |
-| `Consent` | `userId`, `channel`, `type`, `legalBasis`, `optedIn`, `consentedAt`, `proofHash` |
-| `AuditLog` | append-only, tamper-evident; `actor`, `action`, `resourceId`, `status`, `region`, `metadata` — **pseudonymized** (IDs only, no PHI) |
+| Entity                 | Key fields                                                                                                                                                                                                   |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `User`                 | `id`, `region` (US/EU), `timezone`, `locale`                                                                                                                                                                 |
+| `UserChannel`          | `userId`, `channel` (email/sms/push), `address`/`phone`, `deviceToken`, `platform` (ios/android), `verifiedAt`                                                                                               |
+| `NotificationTemplate` | `id`, `channel`, `version`, `subject`/`body`, `variables`, `active`                                                                                                                                          |
+| `Notification`         | `id`, `userId`, `channel`, `platform`, `templateId`, `payload`, `legalBasis`, `region`, `status`, `provider`, `providerMessageId`, `attempts`, `lastError`, `scheduledAt`, `sentAt`, `dedupKey` (**unique**) |
+| `Consent`              | `userId`, `channel`, `type`, `legalBasis`, `optedIn`, `consentedAt`, `proofHash`                                                                                                                             |
+| `AuditLog`             | append-only, tamper-evident; `actor`, `action`, `resourceId`, `status`, `region`, `metadata` — **pseudonymized** (IDs only, no PHI)                                                                          |
 
 > **PHI handling:** message content is rendered at send time and never
 > persisted; identifiers are tokenized; `Notification.payload` holds template
@@ -238,15 +238,15 @@ GET /v1/notifications/:id → { id, status, attempts, providerMessageId }
 
 ## 14. Tech Stack & Rationale
 
-| Layer | Choice | Why |
-| --- | --- | --- |
-| Language/runtime | TypeScript + Node.js 20 LTS | Type-safe provider abstraction; matches Prisma/Testcontainers |
-| Framework | NestJS 11 | Modules, DI, `@nestjs/microservices`/`@nestjs/bullmq` first-class |
-| Queue | BullMQ on Redis 7 | Retry/backoff/DLQ built in; >1k jobs/sec at MVP scale |
-| DB | PostgreSQL 16 + Prisma | Relational metadata; Prisma migrations + typed client |
-| Validation | class-validator / class-transformer | Declarative DTO validation |
-| Health | Terminus | Kubernetes liveness/readiness probes |
-| Tooling | ESLint 9 + Prettier + Husky + lint-staged | Consistent, enforced quality gates |
+| Layer            | Choice                                    | Why                                                               |
+| ---------------- | ----------------------------------------- | ----------------------------------------------------------------- |
+| Language/runtime | TypeScript + Node.js 20 LTS               | Type-safe provider abstraction; matches Prisma/Testcontainers     |
+| Framework        | NestJS 11                                 | Modules, DI, `@nestjs/microservices`/`@nestjs/bullmq` first-class |
+| Queue            | BullMQ on Redis 7                         | Retry/backoff/DLQ built in; >1k jobs/sec at MVP scale             |
+| DB               | PostgreSQL 16 + Prisma                    | Relational metadata; Prisma migrations + typed client             |
+| Validation       | class-validator / class-transformer       | Declarative DTO validation                                        |
+| Health           | Terminus                                  | Kubernetes liveness/readiness probes                              |
+| Tooling          | ESLint 9 + Prettier + Husky + lint-staged | Consistent, enforced quality gates                                |
 
 **Alternative considered:** Go (better raw throughput for workers; more
 boilerplate for the API/provider layer) — revisit if worker fan-out becomes the
@@ -261,5 +261,62 @@ bottleneck.
   APNs), consent portal, DLQ replay UI, and the regional routing gateway are
   Stage 1 follow-ups.
 
+## 16. Implemented Observability, Monitoring, and Error Diagnostics
 
+The Notification Service produces service-local observability signals collected
+by the shared platform observability stack, keeping domain context close to the
+code while enabling cross-service dashboards, alerting, and incident
+investigation.
 
+### 16.1 Structured Logging
+
+- Logging uses Pino through `nestjs-pino`. Production logs are JSON; local
+  development logs are pretty-printed.
+- Every incoming request is assigned an `x-request-id` (or reuses a
+  caller-supplied value). The same value is returned in the response and
+  included in each structured log line, so an API error can be correlated with
+  its server-side log entries and downstream queue/worker records.
+- Sensitive values are redacted before logging: authorization headers, cookies,
+  and notification payload bodies (which may contain PHI). Logs record
+  identifiers and outcomes — never message bodies or contact addresses.
+- Health-check and metrics-scrape traffic is excluded from automatic request
+  logging to avoid noisy telemetry.
+
+### 16.2 Metrics and Readiness
+
+- `GET /api/health/live` is a public liveness probe (heap memory).
+- `GET /api/health/ready` is a public readiness probe that verifies PostgreSQL
+  connectivity via Prisma and returns `200`/`status: "ok"` only when the
+  database is reachable; otherwise it returns `503`/`status: "error"`.
+- `GET /api/metrics` exposes Prometheus text-format metrics: default Node.js
+  process metrics, HTTP request count/latency by method, matched route, and
+  status code, and notification counters labeled by outcome for enqueue and
+  delivery (by channel and provider). Metrics scraping is excluded from HTTP
+  metrics so polling does not distort service traffic figures.
+- Both probes and the metrics endpoint are unauthenticated for infrastructure
+  use. Production ingress must restrict `/api/metrics` to the Prometheus
+  scraper or the private service network.
+
+### 16.3 Error Response Contract
+
+All HTTP exceptions are formatted by the global exception filter into a
+consistent envelope:
+
+```json
+{
+  "type": "Bad Request",
+  "statusCode": 400,
+  "timestamp": "2026-09-09T10:15:30.000Z",
+  "path": "/api/notifications",
+  "requestId": "7a1b2c3d-4e5f-6789-abcd-ef0123456789",
+  "response": {
+    "message": "Idempotency-Key header is required",
+    "statusCode": 400
+  }
+}
+```
+
+Expected client errors (4xx) are logged at warning level without a stack trace.
+Unexpected errors and all 5xx failures are logged at error level with their
+stack trace and request context. Clients treat `response` as the underlying
+Nest error payload and `requestId` as the support correlation key.
