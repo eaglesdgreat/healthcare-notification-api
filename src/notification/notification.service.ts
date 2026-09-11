@@ -13,6 +13,7 @@ import { NotificationJobData } from '@/queue/notification-job.interface.js'
 import { QUEUE_NAMES } from '@/queue/queue.constants.js'
 import { SendNotificationDto } from '@/notification/dto/send-notification.dto.js'
 import { UnsupportedChannelException } from '@/common/exceptions/notification.exceptions.js'
+import { MetricsService } from '@/common/metrics/metrics.service.js'
 
 export interface SendResult {
   id: string
@@ -34,6 +35,7 @@ export class NotificationService {
     private readonly pushIosQueue: Queue<NotificationJobData>,
     @InjectQueue(QUEUE_NAMES.PUSH_ANDROID)
     private readonly pushAndroidQueue: Queue<NotificationJobData>,
+    private readonly metrics: MetricsService,
   ) {}
 
   async send(
@@ -79,6 +81,8 @@ export class NotificationService {
             : undefined,
         },
       )
+
+      this.metrics.incrementEnqueued(dto.channel)
 
       return { id: notification.id, status: notification.status }
     } catch (error: unknown) {

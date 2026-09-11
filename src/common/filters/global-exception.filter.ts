@@ -46,9 +46,11 @@ export class GlobalExceptionFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp()
     const response = ctx.getResponse<Response>()
-    const request = ctx.getRequest<Request>()
+    const request = ctx.getRequest<Request & { id?: string | number }>()
     const requestId =
-      (request.headers['x-request-id'] as string | undefined) ?? randomUUID()
+      (typeof request.id === 'string' ? request.id : undefined) ??
+      (request.headers['x-request-id'] as string | undefined) ??
+      randomUUID()
 
     const { status, errorCode, message } = this.resolve(exception)
 
