@@ -7,6 +7,7 @@ import type { SendNotificationDto } from '@/notification/dto/send-notification.d
 import { NotificationService } from '@/notification/notification.service.js'
 import { PrismaService } from '@/prisma/prisma.service.js'
 import { QUEUE_NAMES } from '@/queue/queue.constants.js'
+import { MetricsService } from '@/common/metrics/metrics.service.js'
 
 describe('NotificationService (integration)', () => {
   let service: NotificationService
@@ -59,6 +60,13 @@ describe('NotificationService (integration)', () => {
         {
           provide: getQueueToken(QUEUE_NAMES.PUSH_ANDROID),
           useValue: { add: jest.fn<() => Promise<any>>() },
+        },
+        {
+          provide: MetricsService,
+          useValue: {
+            incrementEnqueued: jest.fn(),
+            incrementDelivered: jest.fn(),
+          },
         },
       ],
     }).compile()

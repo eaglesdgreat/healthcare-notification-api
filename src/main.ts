@@ -2,12 +2,14 @@ import { Logger, ValidationPipe } from '@nestjs/common'
 import { NestFactory } from '@nestjs/core'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
 import helmet from 'helmet'
+import { Logger as NestPinoLogger } from 'nestjs-pino'
 import { AppModule } from '@/app.module.js'
 import { GlobalExceptionFilter } from '@/common/filters/global-exception.filter.js'
 import { RequestValidationException } from '@/common/exceptions/notification.exceptions.js'
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule)
+  const app = await NestFactory.create(AppModule, { bufferLogs: true })
+  app.useLogger(app.get(NestPinoLogger))
 
   app.use(helmet())
   app.setGlobalPrefix('api')

@@ -13,6 +13,7 @@ import {
   ProviderUnavailableException,
   RecipientNotFoundException,
 } from '@/common/exceptions/notification.exceptions.js'
+import { MetricsService } from '@/common/metrics/metrics.service.js'
 
 @Injectable()
 export class NotificationWorkerService {
@@ -22,6 +23,7 @@ export class NotificationWorkerService {
     private readonly prisma: PrismaService,
     private readonly providers: ProviderRegistry,
     private readonly audit: AuditService,
+    private readonly metrics: MetricsService,
   ) {}
 
   async process(notificationId: string): Promise<void> {
@@ -50,6 +52,11 @@ export class NotificationWorkerService {
         notificationId,
         `No provider configured for channel=${notification.channel}`,
       )
+      this.metrics.incrementDelivered(
+        notification.channel,
+        'unavailable',
+        'failed',
+      )
       throw new ProviderUnavailableException(
         notification.channel,
         notification.platform,
@@ -66,6 +73,11 @@ export class NotificationWorkerService {
       const message =
         error instanceof Error ? error.message : 'Recipient resolution failed'
       await this.markFailed(notificationId, message)
+      this.metrics.incrementDelivered(
+        notification.channel,
+        provider.name,
+        'failed',
+      )
       throw error
     }
 
@@ -105,11 +117,21 @@ export class NotificationWorkerService {
           channel: notification.channel,
         },
       })
+      this.metrics.incrementDelivered(
+        notification.channel,
+        provider.name,
+        'sent',
+      )
       return
     }
 
     const reason = result.error ?? 'Unknown provider error'
     await this.markFailed(notificationId, reason)
+    this.metrics.incrementDelivered(
+      notification.channel,
+      provider.name,
+      'failed',
+    )
     // Throwing triggers BullMQ retry with exponential backoff (see queue.module.ts).
     throw new ProviderDeliveryFailedException(provider.name, reason)
   }

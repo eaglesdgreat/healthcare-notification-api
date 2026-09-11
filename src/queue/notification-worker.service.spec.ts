@@ -26,6 +26,11 @@ describe('NotificationWorkerService', () => {
     resolve: jest.MockedFunction<(channel: any, platform?: any) => any>
   }
   let audit: { record: jest.MockedFunction<(args: any) => Promise<any>> }
+  let metrics: {
+    incrementDelivered: jest.MockedFunction<
+      (channel: string, provider: string, outcome: string) => void
+    >
+  }
   let service: NotificationWorkerService
 
   beforeEach(() => {
@@ -40,10 +45,14 @@ describe('NotificationWorkerService', () => {
     }
     providers = { resolve: jest.fn() }
     audit = { record: jest.fn() }
+    metrics = { incrementDelivered: jest.fn() }
     service = new NotificationWorkerService(
       prisma as unknown as PrismaService,
       providers as unknown as ProviderRegistry,
       audit as unknown as AuditService,
+      metrics as unknown as ConstructorParameters<
+        typeof NotificationWorkerService
+      >[3],
     )
   })
 
@@ -141,6 +150,11 @@ describe('NotificationWorkerService', () => {
       status: 'sent',
       region: 'US',
     })
+    expect(metrics.incrementDelivered).toHaveBeenCalledWith(
+      NotificationChannel.email,
+      'console',
+      'sent',
+    )
   })
 
   it('stores the provider failure, increments attempts, and rethrows when delivery fails', async () => {
@@ -181,6 +195,11 @@ describe('NotificationWorkerService', () => {
         lastError: 'Provider unavailable',
       },
     })
+    expect(metrics.incrementDelivered).toHaveBeenCalledWith(
+      NotificationChannel.sms,
+      'console',
+      'failed',
+    )
   })
 
   it('marks the notification failed and throws when no provider supports the channel', async () => {

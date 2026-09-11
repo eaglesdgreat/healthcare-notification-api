@@ -46,6 +46,9 @@ describe('NotificationService', () => {
       (jobName: string, payload: any, options?: any) => Promise<any>
     >
   }
+  let metrics: {
+    incrementEnqueued: jest.MockedFunction<(channel: string) => void>
+  }
   let service: NotificationService
 
   beforeEach(() => {
@@ -60,6 +63,7 @@ describe('NotificationService', () => {
     smsQueue = { add: jest.fn() }
     pushIosQueue = { add: jest.fn() }
     pushAndroidQueue = { add: jest.fn() }
+    metrics = { incrementEnqueued: jest.fn() }
 
     service = new NotificationService(
       prisma as unknown as PrismaService,
@@ -76,6 +80,9 @@ describe('NotificationService', () => {
       pushAndroidQueue as unknown as ConstructorParameters<
         typeof NotificationService
       >[5],
+      metrics as unknown as ConstructorParameters<
+        typeof NotificationService
+      >[6],
     )
   })
 
@@ -131,6 +138,9 @@ describe('NotificationService', () => {
     expect(queueArgs[0]).toBe('send-notification')
     expect(queueArgs[1]).toEqual({ notificationId: 'ntf_456' })
     expect(queueArgs[2]).toMatchObject({ jobId: 'ntf_456' })
+    expect(metrics.incrementEnqueued).toHaveBeenCalledWith(
+      NotificationChannel.email,
+    )
   })
 
   it('routes push notifications to the Android queue when the platform is Android', async () => {
