@@ -53,8 +53,9 @@ const EXCLUDED_REQUEST_LOG_PREFIXES = ['/api/health', '/api/metrics']
               )
             },
           },
-          // Pretty-print locally; emit JSON in production.
-          ...(config.get('nodeEnv') === 'production'
+          // Pretty-print locally unless JSON is requested; production stays JSON.
+          ...(config.get('nodeEnv') === 'production' ||
+          config.get('logFormat') === 'json'
             ? {}
             : {
                 transport: {

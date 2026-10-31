@@ -110,6 +110,11 @@ contain PHI) are redacted before a log is emitted.
 | `GET /api/health/ready` | Public                                           | Readiness probe. Verifies PostgreSQL connectivity via Prisma. Returns `200` only when the instance can accept traffic; `503` otherwise. |
 | `GET /api/metrics`      | Public; restrict it at the gateway/network layer | Prometheus text-format metrics for service/process health, HTTP request count/latency, and notification enqueue/delivery outcomes.      |
 
+For local integration with the centralized observability stack, see
+[`monitoring/README.md`](./monitoring/README.md). The API exposes Prometheus
+metrics and emits JSON logs in its Docker Compose environment; it does not
+currently export OpenTelemetry traces.
+
 A healthy readiness response is:
 
 ```json
