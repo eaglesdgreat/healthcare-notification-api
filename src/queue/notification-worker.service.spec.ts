@@ -6,6 +6,7 @@ import {
 import { AuditService } from '@/audit/audit.service.js'
 import { PrismaService } from '@/prisma/prisma.service.js'
 import { ProviderRegistry } from '@/providers/provider-registry.service.js'
+import type { ProviderResult } from '@/providers/notification-provider.interface.js'
 import {
   ProviderUnavailableException,
   RecipientNotFoundException,
@@ -200,6 +201,76 @@ describe('NotificationWorkerService', () => {
       'console',
       'failed',
     )
+  })
+
+  it('marks a notification failed after the final provider attempt', async () => {
+    const provider = {
+      name: 'console',
+      send: jest.fn<() => Promise<ProviderResult>>().mockResolvedValue({
+        success: false,
+        error: 'Provider unavailable',
+      }),
+    }
+    prisma.notification.findUnique.mockResolvedValue({
+      id: 'ntf_final',
+      userId: 'user-final',
+      channel: NotificationChannel.email,
+      platform: null,
+      templateId: 'tpl-reminder',
+      payload: {},
+      status: NotificationStatus.queued,
+      region: 'US',
+    })
+    providers.resolve.mockReturnValue(provider)
+    prisma.userChannel.findFirst.mockResolvedValue({
+      address: 'patient@example.com',
+    })
+
+    await expect(service.process('ntf_final', true)).rejects.toThrow(
+      'Provider "console" failed to deliver: Provider unavailable',
+    )
+    expect(prisma.notification.update).toHaveBeenLastCalledWith({
+      where: { id: 'ntf_final' },
+      data: {
+        status: NotificationStatus.failed,
+        attempts: { increment: 1 },
+        lastError: 'Provider unavailable',
+      },
+    })
+  })
+
+  it('records thrown provider errors and rethrows them as delivery failures', async () => {
+    const provider = {
+      name: 'console',
+      send: jest
+        .fn<() => Promise<ProviderResult>>()
+        .mockRejectedValue(new Error('Provider unavailable')),
+    }
+    prisma.notification.findUnique.mockResolvedValue({
+      id: 'ntf_thrown',
+      userId: 'user-thrown',
+      channel: NotificationChannel.email,
+      platform: null,
+      templateId: 'tpl-reminder',
+      payload: {},
+      status: NotificationStatus.queued,
+      region: 'US',
+    })
+    providers.resolve.mockReturnValue(provider)
+    prisma.userChannel.findFirst.mockResolvedValue({
+      address: 'patient@example.com',
+    })
+
+    await expect(service.process('ntf_thrown')).rejects.toThrow(
+      'Provider "console" failed to deliver: Provider unavailable',
+    )
+    expect(prisma.notification.update).toHaveBeenLastCalledWith({
+      where: { id: 'ntf_thrown' },
+      data: {
+        attempts: { increment: 1 },
+        lastError: 'Provider unavailable',
+      },
+    })
   })
 
   it('marks the notification failed and throws when no provider supports the channel', async () => {

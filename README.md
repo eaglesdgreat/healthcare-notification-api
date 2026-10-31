@@ -1,8 +1,10 @@
 # Healthcare Notification API
 
 Multi-channel notification service (email, SMS, push) for a healthcare platform.
-Built with **NestJS + TypeScript**, designed for **HIPAA + GDPR** compliance
-across **US/EU** regions.
+Built with **NestJS + TypeScript** as a scaffold for a future HIPAA/GDPR-compliant
+service across **US/EU** regions. It is not currently production-ready or
+compliance-certified; see the implementation status in
+[`NOTIF_DESIGN.md`](./NOTIF_DESIGN.md).
 
 > Stage 1 scaffold — see [`NOTIF_DESIGN.md`](./NOTIF_DESIGN.md) for the full
 > system design.
@@ -10,7 +12,7 @@ across **US/EU** regions.
 ## Stack
 
 - **NestJS 11** (TypeScript, ESM)
-- **BullMQ** + Redis for queues/workers (retry, exponential backoff, dead-letter)
+- **BullMQ** + Redis for queues/workers (retry and exponential backoff)
 - **Prisma** + PostgreSQL
 - **class-validator** for request validation
 - **Terminus** for liveness/readiness probes
@@ -21,7 +23,7 @@ across **US/EU** regions.
 
 ```bash
 # 1. install dependencies
-pnpm install
+corepack pnpm install
 
 # 2. configure (copy and adjust)
 cp .env.example .env
@@ -30,26 +32,27 @@ cp .env.example .env
 docker compose up -d
 
 # 4. generate the Prisma client + apply migrations
-pnpm prisma:generate
-pnpm prisma:migrate
+pnpm run prisma:generate
+pnpm run prisma:migrate
 
 # 5. run
-pnpm start:dev
+pnpm run start:dev
 ```
 
 ## Scripts
 
-| Command                        | Description                              |
-| ------------------------------ | ---------------------------------------- |
-| `pnpm start:dev`               | Run in watch mode                        |
-| `pnpm build`                   | Production build                         |
-| `pnpm typecheck`               | TypeScript check (no emit)               |
-| `pnpm lint` / `lint:fix`       | ESLint (check / autofix)                 |
-| `pnpm format` / `format:check` | Prettier (write / check)                 |
-| `pnpm test`                    | Unit tests                               |
-| `pnpm test:e2e`                | e2e tests (requires `docker compose up`) |
-| `pnpm prisma:migrate`          | Create/apply Prisma migrations           |
-| `pnpm prisma:studio`           | Open Prisma Studio                       |
+| Command                             | Description                                   |
+| ----------------------------------- | --------------------------------------------- |
+| `pnpm start:dev`                    | Run in watch mode                             |
+| `pnpm build`                        | Production build                              |
+| `pnpm typecheck`                    | TypeScript check (no emit)                    |
+| `pnpm lint` / `pnpm lint:fix`       | ESLint (check / autofix)                      |
+| `pnpm format` / `pnpm format:check` | Prettier (write / check)                      |
+| `pnpm test`                         | Unit tests                                    |
+| `pnpm test:integration`             | Nest dependency-injection integration test    |
+| `pnpm test:e2e`                     | HTTP/API e2e tests (external services mocked) |
+| `pnpm prisma:migrate`               | Create/apply Prisma migrations                |
+| `pnpm prisma:studio`                | Open Prisma Studio                            |
 
 ## API
 
@@ -123,20 +126,22 @@ escalating an issue; it links the client-visible error to the structured logs.
 
 ```json
 {
-  "type": "Bad Request",
   "statusCode": 400,
-  "timestamp": "2026-09-09T10:15:30.000Z",
+  "errorCode": "IDEMPOTENCY_KEY_REQUIRED",
+  "message": "Idempotency-Key header is required",
   "path": "/api/notifications",
-  "requestId": "7a1b2c3d-4e5f-6789-abcd-ef0123456789",
-  "response": {
-    "message": "Idempotency-Key header is required",
-    "statusCode": 400
-  }
+  "method": "POST",
+  "timestamp": "2026-10-31T00:00:00.000Z",
+  "requestId": "7a1b2c3d-4e5f-6789-abcd-ef0123456789"
 }
 ```
 
+`message` is a string; validation failures combine constraint messages into a
+semicolon-separated string. `errorCode` is machine-readable and stable.
+
 Do not expose `/api/metrics` directly to the public internet in production.
 Permit only the Prometheus scraper or the private service network to access it.
+
 ## API documentation (Swagger / OpenAPI)
 
 Interactive API docs are served at `/api/docs` when the app is running
@@ -169,8 +174,8 @@ into a single consistent JSON shape:
   e.g. `NOTIFICATION_NOT_FOUND`, `PROVIDER_UNAVAILABLE`,
   `RECIPIENT_NOT_FOUND`, `UNSUPPORTED_CHANNEL`, `PROVIDER_DELIVERY_FAILED`,
   `IDEMPOTENCY_KEY_REQUIRED`, `VALIDATION_FAILED`).
-- `message` is a string for most errors, or an array of strings for
-  validation failures (one entry per failed constraint).
+- `message` is a string. Validation failures combine constraint messages
+  into a semicolon-separated string.
 - `requestId` is taken from the incoming `x-request-id` header if present,
   otherwise generated, so it can be used to correlate client reports with
   server logs.
