@@ -1,5 +1,5 @@
 # Stage 1: Base & Dependencies
-FROM node:22-slim AS base
+FROM node:24-slim AS base
 
 # Install netcat (nc) for the wait-for.sh script, procps for cleanup,
 # and build tools for native addons
@@ -47,7 +47,7 @@ FROM base AS prod-deps
 RUN pnpm install --prod --frozen-lockfile
 
 # Stage 4: Production Release
-FROM node:22-slim AS release
+FROM node:24-slim AS release
 
 # Install netcat in release too (for wait-for.sh in ops environments)
 RUN apt-get update && apt-get install -y netcat-openbsd && rm -rf /var/lib/apt/lists/*
