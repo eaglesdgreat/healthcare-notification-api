@@ -1,6 +1,7 @@
 export interface AppConfig {
   port: number
   nodeEnv: string
+  logFormat: string
   region: 'US' | 'EU'
   redis: {
     host: string
@@ -15,6 +16,7 @@ export interface AppConfig {
 export default (): AppConfig => ({
   port: Number.parseInt(process.env.PORT ?? '3000', 10),
   nodeEnv: process.env.NODE_ENV ?? 'development',
+  logFormat: process.env.LOG_FORMAT ?? 'pretty',
   region: (process.env.APP_REGION as 'US' | 'EU') ?? 'US',
   redis: {
     host: process.env.REDIS_HOST ?? 'localhost',

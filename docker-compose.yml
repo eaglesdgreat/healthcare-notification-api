@@ -21,6 +21,7 @@ services:
       - ms-notification-redis
     environment:
       - NODE_ENV=dev
+      - LOG_FORMAT=json
       - PORT=5502
       # Override localhost values so the app reaches the containers on the compose network
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@ms-notification-db:5432/${POSTGRES_DB}?schema=public
