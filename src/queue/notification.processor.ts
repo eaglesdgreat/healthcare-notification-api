@@ -15,7 +15,10 @@ export class EmailNotificationProcessor extends WorkerHost {
 
   async process(job: Job<NotificationJobData>): Promise<void> {
     this.logger.log(`Processing email job ${job.id}`)
-    await this.workerService.process(job.data.notificationId)
+    await this.workerService.process(
+      job.data.notificationId,
+      job.attemptsMade + 1 >= (job.opts.attempts ?? 1),
+    )
   }
 }
 
@@ -29,7 +32,10 @@ export class SmsNotificationProcessor extends WorkerHost {
 
   async process(job: Job<NotificationJobData>): Promise<void> {
     this.logger.log(`Processing sms job ${job.id}`)
-    await this.workerService.process(job.data.notificationId)
+    await this.workerService.process(
+      job.data.notificationId,
+      job.attemptsMade + 1 >= (job.opts.attempts ?? 1),
+    )
   }
 }
 
@@ -43,7 +49,10 @@ export class IosPushNotificationProcessor extends WorkerHost {
 
   async process(job: Job<NotificationJobData>): Promise<void> {
     this.logger.log(`Processing ios push job ${job.id}`)
-    await this.workerService.process(job.data.notificationId)
+    await this.workerService.process(
+      job.data.notificationId,
+      job.attemptsMade + 1 >= (job.opts.attempts ?? 1),
+    )
   }
 }
 
@@ -57,6 +66,9 @@ export class AndroidPushNotificationProcessor extends WorkerHost {
 
   async process(job: Job<NotificationJobData>): Promise<void> {
     this.logger.log(`Processing android push job ${job.id}`)
-    await this.workerService.process(job.data.notificationId)
+    await this.workerService.process(
+      job.data.notificationId,
+      job.attemptsMade + 1 >= (job.opts.attempts ?? 1),
+    )
   }
 }

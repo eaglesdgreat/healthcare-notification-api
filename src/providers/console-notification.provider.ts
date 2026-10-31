@@ -26,7 +26,7 @@ export class ConsoleNotificationProvider implements NotificationProvider {
       ? `${payload.channel}/${payload.platform}`
       : payload.channel
     this.logger.log(
-      `[console] Sending ${target} notification to ${payload.recipient} (template: ${payload.templateId}) — ${payload.content.body}`,
+      `[console] Sending ${target} notification (template: ${payload.templateId})`,
     )
     return Promise.resolve({
       success: true,

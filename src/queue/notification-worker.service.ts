@@ -6,6 +6,7 @@ import {
 import { AuditService } from '@/audit/audit.service.js'
 import { PrismaService } from '@/prisma/prisma.service.js'
 import { ProviderPayload } from '@/providers/notification-provider.interface.js'
+import type { ProviderResult } from '@/providers/notification-provider.interface.js'
 import { ProviderRegistry } from '@/providers/provider-registry.service.js'
 import {
   NotificationNotFoundException,
@@ -24,7 +25,7 @@ export class NotificationWorkerService {
     private readonly audit: AuditService,
   ) {}
 
-  async process(notificationId: string): Promise<void> {
+  async process(notificationId: string, isFinalAttempt = false): Promise<void> {
     const notification = await this.prisma.notification.findUnique({
       where: { id: notificationId },
     })
@@ -49,6 +50,7 @@ export class NotificationWorkerService {
       await this.markFailed(
         notificationId,
         `No provider configured for channel=${notification.channel}`,
+        isFinalAttempt,
       )
       throw new ProviderUnavailableException(
         notification.channel,
@@ -65,7 +67,7 @@ export class NotificationWorkerService {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Recipient resolution failed'
-      await this.markFailed(notificationId, message)
+      await this.markFailed(notificationId, message, isFinalAttempt)
       throw error
     }
 
@@ -80,7 +82,15 @@ export class NotificationWorkerService {
       },
     }
 
-    const result = await provider.send(payload)
+    let result: ProviderResult
+    try {
+      result = await provider.send(payload)
+    } catch (error) {
+      const reason =
+        error instanceof Error ? error.message : 'Unknown provider error'
+      await this.markFailed(notificationId, reason, isFinalAttempt)
+      throw new ProviderDeliveryFailedException(provider.name, reason)
+    }
 
     if (result.success) {
       await this.prisma.notification.update({
@@ -109,7 +119,7 @@ export class NotificationWorkerService {
     }
 
     const reason = result.error ?? 'Unknown provider error'
-    await this.markFailed(notificationId, reason)
+    await this.markFailed(notificationId, reason, isFinalAttempt)
     // Throwing triggers BullMQ retry with exponential backoff (see queue.module.ts).
     throw new ProviderDeliveryFailedException(provider.name, reason)
   }
@@ -117,10 +127,12 @@ export class NotificationWorkerService {
   private async markFailed(
     notificationId: string,
     reason: string,
+    isFinalAttempt: boolean,
   ): Promise<void> {
     await this.prisma.notification.update({
       where: { id: notificationId },
       data: {
+        ...(isFinalAttempt ? { status: NotificationStatus.failed } : {}),
         attempts: { increment: 1 },
         lastError: reason,
       },

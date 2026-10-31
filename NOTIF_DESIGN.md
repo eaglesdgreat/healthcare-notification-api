@@ -4,6 +4,14 @@ A standalone, multi-tenant notification microservice that lets other internal
 services send **email, SMS, and push (iOS/Android)** notifications reliably,
 with **HIPAA + GDPR** compliance across **US and EU** regions.
 
+> **Implementation status:** this document describes the target architecture;
+> the repository is currently an MVP scaffold, not a production-ready or
+> HIPAA/GDPR-compliant service. Authentication, consent/opt-out enforcement,
+> template rendering, verified-recipient enforcement, encryption/tokenization,
+> regional isolation, delivery webhooks, dead-letter handling, and production
+> observability are not implemented yet. Do not send real patient data through
+> the current application.
+
 ---
 
 ## 1. Overview
@@ -111,18 +119,19 @@ with **HIPAA + GDPR** compliance across **US and EU** regions.
 
 ## 5. Data Model (per-region Postgres)
 
-| Entity | Key fields |
-| --- | --- |
-| `User` | `id`, `region` (US/EU), `timezone`, `locale` |
-| `UserChannel` | `userId`, `channel` (email/sms/push), `address`/`phone`, `deviceToken`, `platform` (ios/android), `verifiedAt` |
-| `NotificationTemplate` | `id`, `channel`, `version`, `subject`/`body`, `variables`, `active` |
-| `Notification` | `id`, `userId`, `channel`, `platform`, `templateId`, `payload`, `legalBasis`, `region`, `status`, `provider`, `providerMessageId`, `attempts`, `lastError`, `scheduledAt`, `sentAt`, `dedupKey` (**unique**) |
-| `Consent` | `userId`, `channel`, `type`, `legalBasis`, `optedIn`, `consentedAt`, `proofHash` |
-| `AuditLog` | append-only, tamper-evident; `actor`, `action`, `resourceId`, `status`, `region`, `metadata` — **pseudonymized** (IDs only, no PHI) |
+| Entity                 | Key fields                                                                                                                                                                                                   |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `User`                 | `id`, `region` (US/EU), `timezone`, `locale`                                                                                                                                                                 |
+| `UserChannel`          | `userId`, `channel` (email/sms/push), `address`/`phone`, `deviceToken`, `platform` (ios/android), `verifiedAt`                                                                                               |
+| `NotificationTemplate` | `id`, `channel`, `version`, `subject`/`body`, `variables`, `active`                                                                                                                                          |
+| `Notification`         | `id`, `userId`, `channel`, `platform`, `templateId`, `payload`, `legalBasis`, `region`, `status`, `provider`, `providerMessageId`, `attempts`, `lastError`, `scheduledAt`, `sentAt`, `dedupKey` (**unique**) |
+| `Consent`              | `userId`, `channel`, `type`, `legalBasis`, `optedIn`, `consentedAt`, `proofHash`                                                                                                                             |
+| `AuditLog`             | append-only, tamper-evident; `actor`, `action`, `resourceId`, `status`, `region`, `metadata` — **pseudonymized** (IDs only, no PHI)                                                                          |
 
-> **PHI handling:** message content is rendered at send time and never
-> persisted; identifiers are tokenized; `Notification.payload` holds template
-> variables only (no PHI required).
+> **Target PHI handling:** message content should be rendered at send time and
+> never persisted; identifiers should be tokenized; `Notification.payload`
+> should contain template variables only and must not contain PHI. The current
+> scaffold does not enforce these constraints.
 
 ## 6. API Contracts
 
@@ -238,15 +247,15 @@ GET /v1/notifications/:id → { id, status, attempts, providerMessageId }
 
 ## 14. Tech Stack & Rationale
 
-| Layer | Choice | Why |
-| --- | --- | --- |
-| Language/runtime | TypeScript + Node.js 20 LTS | Type-safe provider abstraction; matches Prisma/Testcontainers |
-| Framework | NestJS 11 | Modules, DI, `@nestjs/microservices`/`@nestjs/bullmq` first-class |
-| Queue | BullMQ on Redis 7 | Retry/backoff/DLQ built in; >1k jobs/sec at MVP scale |
-| DB | PostgreSQL 16 + Prisma | Relational metadata; Prisma migrations + typed client |
-| Validation | class-validator / class-transformer | Declarative DTO validation |
-| Health | Terminus | Kubernetes liveness/readiness probes |
-| Tooling | ESLint 9 + Prettier + Husky + lint-staged | Consistent, enforced quality gates |
+| Layer            | Choice                                    | Why                                                               |
+| ---------------- | ----------------------------------------- | ----------------------------------------------------------------- |
+| Language/runtime | TypeScript + Node.js 24 LTS               | Type-safe provider abstraction; matches Prisma/Testcontainers     |
+| Framework        | NestJS 11                                 | Modules, DI, `@nestjs/microservices`/`@nestjs/bullmq` first-class |
+| Queue            | BullMQ on Redis 7                         | Retry/backoff/DLQ built in; >1k jobs/sec at MVP scale             |
+| DB               | PostgreSQL 16 + Prisma                    | Relational metadata; Prisma migrations + typed client             |
+| Validation       | class-validator / class-transformer       | Declarative DTO validation                                        |
+| Health           | Terminus                                  | Kubernetes liveness/readiness probes                              |
+| Tooling          | ESLint 9 + Prettier + Husky + lint-staged | Consistent, enforced quality gates                                |
 
 **Alternative considered:** Go (better raw throughput for workers; more
 boilerplate for the API/provider layer) — revisit if worker fan-out becomes the
@@ -260,6 +269,3 @@ bottleneck.
 - **Open:** rate limiting (Throttler), provider SDK wiring (SendGrid/Twilio/FCM/
   APNs), consent portal, DLQ replay UI, and the regional routing gateway are
   Stage 1 follow-ups.
-
-
-

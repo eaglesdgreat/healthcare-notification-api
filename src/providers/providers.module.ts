@@ -11,8 +11,9 @@ export class ProvidersModule {
     registry: ProviderRegistry,
     consoleProvider: ConsoleNotificationProvider,
   ) {
-    // Register the console provider as the development default.
-    registry.register(consoleProvider)
+    if (process.env.NODE_ENV !== 'production') {
+      registry.register(consoleProvider)
+    }
 
     // Wire real providers once their SDKs are configured, e.g.:
     // registry.register(new SendGridProvider());
