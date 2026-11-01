@@ -115,6 +115,13 @@ For local integration with the centralized observability stack, see
 metrics and emits JSON logs in its Docker Compose environment; it does not
 currently export OpenTelemetry traces.
 
+HTTP request completions and failures (including health checks and metrics
+scrapes), notification enqueue and deduplication outcomes, delivery attempts,
+and audit persistence outcomes are logged as structured events. A request ID is
+carried into the delivery job so API and worker records can be correlated. Logs
+omit notification payloads and recipient addresses and are collected from
+Docker stdout by the observability stack's Alloy agent and stored in Loki.
+
 A healthy readiness response is:
 
 ```json

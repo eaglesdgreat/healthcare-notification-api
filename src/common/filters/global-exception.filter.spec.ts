@@ -1,5 +1,10 @@
 import { jest } from '@jest/globals'
-import { ArgumentsHost, BadRequestException, HttpStatus } from '@nestjs/common'
+import {
+  ArgumentsHost,
+  BadRequestException,
+  HttpStatus,
+  Logger,
+} from '@nestjs/common'
 import { Prisma } from '@/generated/prisma/client.js'
 import { NotificationNotFoundException } from '@/common/exceptions/notification.exceptions.js'
 import { GlobalExceptionFilter } from '@/common/filters/global-exception.filter.js'
@@ -33,9 +38,21 @@ function createHost(overrides?: { headers?: Record<string, string> }): {
 
 describe('GlobalExceptionFilter', () => {
   let filter: GlobalExceptionFilter
+  let warnSpy: jest.SpiedFunction<typeof Logger.prototype.warn>
+  let errorSpy: jest.SpiedFunction<typeof Logger.prototype.error>
 
   beforeEach(() => {
+    warnSpy = jest
+      .spyOn(Logger.prototype, 'warn')
+      .mockImplementation(() => undefined)
+    errorSpy = jest
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation(() => undefined)
     filter = new GlobalExceptionFilter()
+  })
+
+  afterEach(() => {
+    jest.restoreAllMocks()
   })
 
   it('maps domain exceptions to their declared status and errorCode', () => {
@@ -45,6 +62,13 @@ describe('GlobalExceptionFilter', () => {
     filter.catch(exception, host)
 
     expect(status).toHaveBeenCalledWith(HttpStatus.NOT_FOUND)
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: 'http.request.failed',
+        errorCode: 'NOTIFICATION_NOT_FOUND',
+        message: 'HTTP request failed',
+      }),
+    )
     expect(json).toHaveBeenCalledWith(
       expect.objectContaining({
         statusCode: HttpStatus.NOT_FOUND,
@@ -97,6 +121,15 @@ describe('GlobalExceptionFilter', () => {
     filter.catch(new Error('boom'), host)
 
     expect(status).toHaveBeenCalledWith(HttpStatus.INTERNAL_SERVER_ERROR)
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: 'http.request.failed',
+        errorCode: 'INTERNAL_SERVER_ERROR',
+        errorType: 'Error',
+        message: 'HTTP request failed',
+      }),
+    )
+    expect(JSON.stringify(errorSpy.mock.calls)).not.toContain('boom')
     expect(json).toHaveBeenCalledWith(
       expect.objectContaining({
         statusCode: HttpStatus.INTERNAL_SERVER_ERROR,

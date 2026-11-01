@@ -41,19 +41,21 @@ export class NotificationService {
   async send(
     dto: SendNotificationDto,
     idempotencyKey: string,
+    requestId?: string,
   ): Promise<SendResult> {
-    const existing = await this.prisma.notification.findUnique({
-      where: { dedupKey: idempotencyKey },
-    })
-    if (existing) {
-      return { id: existing.id, status: existing.status }
-    }
-
     // TODO: resolve the user's region from the user directory (multi-region
     // gateway). For now each deployed instance is pinned to its own region.
     const region = this.config.get<string>('region') ?? 'US'
 
     try {
+      const existing = await this.prisma.notification.findUnique({
+        where: { dedupKey: idempotencyKey },
+      })
+      if (existing) {
+        this.logDuplicate(existing.id, existing.status, dto.channel, requestId)
+        return { id: existing.id, status: existing.status }
+      }
+
       const notification = await this.prisma.notification.create({
         data: {
           id: `ntf_${randomUUID()}`,
@@ -73,7 +75,7 @@ export class NotificationService {
 
       await this.queueFor(dto).add(
         'send-notification',
-        { notificationId: notification.id },
+        { notificationId: notification.id, requestId },
         {
           jobId: notification.id,
           delay: dto.scheduledAt
@@ -83,6 +85,14 @@ export class NotificationService {
       )
 
       this.metrics.incrementEnqueued(dto.channel)
+      this.logger.log({
+        event: 'notification.enqueue.succeeded',
+        notificationId: notification.id,
+        channel: dto.channel,
+        region,
+        requestId,
+        message: 'Notification accepted and queued',
+      })
 
       return { id: notification.id, status: notification.status }
     } catch (error: unknown) {
@@ -90,18 +100,58 @@ export class NotificationService {
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2002'
       ) {
-        const duplicate = await this.prisma.notification.findUnique({
-          where: { dedupKey: idempotencyKey },
-        })
+        let duplicate
+        try {
+          duplicate = await this.prisma.notification.findUnique({
+            where: { dedupKey: idempotencyKey },
+          })
+        } catch (lookupError) {
+          this.logEnqueueFailure(lookupError, dto.channel, requestId)
+          throw lookupError
+        }
         if (duplicate) {
+          this.logDuplicate(
+            duplicate.id,
+            duplicate.status,
+            dto.channel,
+            requestId,
+          )
           return { id: duplicate.id, status: duplicate.status }
         }
       }
-      const detail =
-        error instanceof Error ? (error.stack ?? error.message) : String(error)
-      this.logger.error(`Failed to enqueue notification: ${detail}`)
+      this.logEnqueueFailure(error, dto.channel, requestId)
       throw error
     }
+  }
+
+  private logDuplicate(
+    notificationId: string,
+    status: NotificationStatus,
+    channel: string,
+    requestId?: string,
+  ): void {
+    this.logger.log({
+      event: 'notification.enqueue.duplicate',
+      notificationId,
+      channel,
+      status,
+      requestId,
+      message: 'Duplicate notification request returned existing notification',
+    })
+  }
+
+  private logEnqueueFailure(
+    error: unknown,
+    channel: string,
+    requestId?: string,
+  ): void {
+    this.logger.error({
+      event: 'notification.enqueue.failed',
+      channel,
+      requestId,
+      errorType: error instanceof Error ? error.name : 'UnknownError',
+      message: 'Failed to enqueue notification',
+    })
   }
 
   private queueFor(dto: SendNotificationDto): Queue<NotificationJobData> {

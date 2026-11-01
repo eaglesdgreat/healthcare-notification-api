@@ -11,9 +11,6 @@ import { NotificationModule } from '@/notification/notification.module.js'
 import { PrismaModule } from '@/prisma/prisma.module.js'
 import { QueueModule } from '@/queue/queue.module.js'
 
-/** Infrastructure traffic that must not produce noisy request logs. */
-const EXCLUDED_REQUEST_LOG_PREFIXES = ['/api/health', '/api/metrics']
-
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -34,24 +31,34 @@ const EXCLUDED_REQUEST_LOG_PREFIXES = ['/api/health', '/api/metrics']
             res.setHeader('x-request-id', id)
             return id
           },
-          customProps: (req: IncomingMessage) => ({
+          customProps: (req: IncomingMessage, res: ServerResponse) => ({
+            event:
+              res.statusCode >= 400
+                ? 'http.request.failed'
+                : 'http.request.completed',
             requestId: (req as IncomingMessage & { id?: unknown }).id,
           }),
           redact: {
             paths: [
               'req.headers.authorization',
               'req.headers.cookie',
+              'req.headers["idempotency-key"]',
               'res.headers["set-cookie"]',
             ],
             censor: '[REDACTED]',
           },
-          autoLogging: {
-            ignore: (req: IncomingMessage) => {
-              const url = req.url ?? ''
-              return EXCLUDED_REQUEST_LOG_PREFIXES.some((prefix) =>
-                url.startsWith(prefix),
-              )
-            },
+          serializers: {
+            req: (
+              req: IncomingMessage & {
+                id?: string | number
+                route?: { path?: string }
+              },
+            ) => ({
+              id: req.id,
+              method: req.method,
+              route: req.route?.path ?? 'unmatched',
+            }),
+            res: (res: ServerResponse) => ({ statusCode: res.statusCode }),
           },
           // Pretty-print locally unless JSON is requested; production stays JSON.
           ...(config.get('nodeEnv') === 'production' ||

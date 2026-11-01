@@ -1,4 +1,5 @@
 import { jest } from '@jest/globals'
+import { Logger } from '@nestjs/common'
 import { NotificationStatus } from '@/generated/prisma/enums.js'
 import { PrismaService } from '@/prisma/prisma.service.js'
 import {
@@ -21,14 +22,22 @@ describe('NotificationController', () => {
       findUnique: jest.MockedFunction<(args: any) => Promise<any>>
     }
   }
+  let logSpy: jest.SpiedFunction<typeof Logger.prototype.log>
 
   beforeEach(() => {
     notificationService = { send: jest.fn() }
     prisma = { notification: { findUnique: jest.fn() } }
+    logSpy = jest
+      .spyOn(Logger.prototype, 'log')
+      .mockImplementation(() => undefined)
     controller = new NotificationController(
       notificationService as unknown as NotificationService,
       prisma as unknown as PrismaService,
     )
+  })
+
+  afterEach(() => {
+    jest.restoreAllMocks()
   })
 
   it('rejects requests that do not include the Idempotency-Key header', () => {
@@ -56,8 +65,14 @@ describe('NotificationController', () => {
 
     notificationService.send.mockResolvedValue(result)
 
-    await expect(controller.send(dto, 'idem-123')).resolves.toEqual(result)
-    expect(notificationService.send).toHaveBeenCalledWith(dto, 'idem-123')
+    await expect(
+      controller.send(dto, 'idem-123', { id: 'req-123' } as never),
+    ).resolves.toEqual(result)
+    expect(notificationService.send).toHaveBeenCalledWith(
+      dto,
+      'idem-123',
+      'req-123',
+    )
   })
 
   it('returns the existing notification record for a valid id', async () => {
@@ -70,7 +85,18 @@ describe('NotificationController', () => {
 
     prisma.notification.findUnique.mockResolvedValue(record)
 
-    await expect(controller.getStatus('ntf_123')).resolves.toEqual(record)
+    await expect(
+      controller.getStatus('ntf_123', { id: 'req-123' } as never),
+    ).resolves.toEqual(record)
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: 'notification.status.read',
+        notificationId: 'ntf_123',
+        status: NotificationStatus.sent,
+        requestId: 'req-123',
+        message: 'Notification status retrieved',
+      }),
+    )
     expect(prisma.notification.findUnique).toHaveBeenCalledWith({
       where: { id: 'ntf_123' },
       select: {

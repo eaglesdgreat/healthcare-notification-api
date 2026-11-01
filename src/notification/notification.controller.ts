@@ -6,7 +6,10 @@ import {
   HttpCode,
   Param,
   Post,
+  Req,
+  Logger,
 } from '@nestjs/common'
+import type { Request } from 'express'
 import {
   ApiHeader,
   ApiOperation,
@@ -25,6 +28,8 @@ import { NotificationService } from '@/notification/notification.service.js'
 @ApiTags('notifications')
 @Controller('notifications')
 export class NotificationController {
+  private readonly logger = new Logger(NotificationController.name)
+
   constructor(
     private readonly notificationService: NotificationService,
     private readonly prisma: PrismaService,
@@ -54,11 +59,12 @@ export class NotificationController {
   send(
     @Body() dto: SendNotificationDto,
     @Headers('idempotency-key') idempotencyKey?: string,
+    @Req() request?: Request & { id?: string },
   ): Promise<{ id: string; status: NotificationStatus }> {
     if (!idempotencyKey) {
       throw new IdempotencyKeyRequiredException()
     }
-    return this.notificationService.send(dto, idempotencyKey)
+    return this.notificationService.send(dto, idempotencyKey, request?.id)
   }
 
   @Get(':id')
@@ -70,7 +76,10 @@ export class NotificationController {
     type: NotificationStatusResponseDto,
   })
   @ApiResponse({ status: 404, description: 'Notification not found.' })
-  async getStatus(@Param('id') id: string): Promise<{
+  async getStatus(
+    @Param('id') id: string,
+    @Req() request?: Request & { id?: string },
+  ): Promise<{
     id: string
     status: NotificationStatus
     attempts: number
@@ -88,6 +97,13 @@ export class NotificationController {
     if (!notification) {
       throw new NotificationNotFoundException(id)
     }
+    this.logger.log({
+      event: 'notification.status.read',
+      notificationId: notification.id,
+      status: notification.status,
+      requestId: request?.id,
+      message: 'Notification status retrieved',
+    })
     return notification
   }
 }

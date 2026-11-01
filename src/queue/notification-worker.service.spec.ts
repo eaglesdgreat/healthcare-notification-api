@@ -1,4 +1,5 @@
 import { jest } from '@jest/globals'
+import { Logger } from '@nestjs/common'
 import {
   NotificationChannel,
   NotificationStatus,
@@ -32,6 +33,9 @@ describe('NotificationWorkerService', () => {
       (channel: string, provider: string, outcome: string) => void
     >
   }
+  let logSpy: jest.SpiedFunction<typeof Logger.prototype.log>
+  let warnSpy: jest.SpiedFunction<typeof Logger.prototype.warn>
+  let errorSpy: jest.SpiedFunction<typeof Logger.prototype.error>
   let service: NotificationWorkerService
 
   beforeEach(() => {
@@ -47,6 +51,15 @@ describe('NotificationWorkerService', () => {
     providers = { resolve: jest.fn() }
     audit = { record: jest.fn() }
     metrics = { incrementDelivered: jest.fn() }
+    logSpy = jest
+      .spyOn(Logger.prototype, 'log')
+      .mockImplementation(() => undefined)
+    warnSpy = jest
+      .spyOn(Logger.prototype, 'warn')
+      .mockImplementation(() => undefined)
+    errorSpy = jest
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation(() => undefined)
     service = new NotificationWorkerService(
       prisma as unknown as PrismaService,
       providers as unknown as ProviderRegistry,
@@ -57,6 +70,10 @@ describe('NotificationWorkerService', () => {
     )
   })
 
+  afterEach(() => {
+    jest.restoreAllMocks()
+  })
+
   it('throws when the notification is missing', async () => {
     prisma.notification.findUnique.mockResolvedValue(null)
 
@@ -64,6 +81,58 @@ describe('NotificationWorkerService', () => {
       'Notification missing-id not found',
     )
     expect(prisma.notification.update).not.toHaveBeenCalled()
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: 'notification.delivery.failed',
+        notificationId: 'missing-id',
+        message: 'Notification delivery attempt failed',
+      }),
+    )
+    expect(JSON.stringify(errorSpy.mock.calls)).not.toContain(
+      'Provider unavailable',
+    )
+  })
+
+  it('distinguishes audit persistence failures after successful provider delivery', async () => {
+    const provider = {
+      name: 'console',
+      send: jest.fn<() => Promise<ProviderResult>>().mockResolvedValue({
+        success: true,
+        providerMessageId: 'provider-1',
+      }),
+    }
+    prisma.notification.findUnique.mockResolvedValue({
+      id: 'ntf_audit_failure',
+      userId: 'user-1',
+      channel: NotificationChannel.email,
+      platform: null,
+      templateId: 'tpl-reminder',
+      payload: {},
+      status: NotificationStatus.queued,
+      attempts: 0,
+      region: 'US',
+    })
+    providers.resolve.mockReturnValue(provider)
+    prisma.userChannel.findFirst.mockResolvedValue({
+      address: 'patient@example.com',
+    })
+    const auditFailure = new Error('audit store unavailable')
+    audit.record.mockRejectedValue(auditFailure)
+
+    await expect(
+      service.process('ntf_audit_failure', true, 'req-audit'),
+    ).rejects.toBe(auditFailure)
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: 'notification.processing.failed',
+        notificationId: 'ntf_audit_failure',
+        requestId: 'req-audit',
+        deliveryOutcome: 'sent',
+        stage: 'persist_audit',
+        message: 'Notification delivered but processing failed',
+      }),
+    )
   })
 
   it('skips processing when the notification already sent', async () => {
@@ -72,9 +141,16 @@ describe('NotificationWorkerService', () => {
       status: NotificationStatus.sent,
     })
 
-    await service.process('ntf_123')
+    await service.process('ntf_123', false, 'req-123')
 
     expect(prisma.notification.update).not.toHaveBeenCalled()
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: 'notification.delivery.skipped',
+        notificationId: 'ntf_123',
+        message: 'Notification was already sent',
+      }),
+    )
   })
 
   it('marks a notification as processing, sends through the provider, and records the audit event on success', async () => {
@@ -107,7 +183,7 @@ describe('NotificationWorkerService', () => {
       address: 'patient@example.com',
     })
 
-    await service.process('ntf_123')
+    await service.process('ntf_123', false, 'req-123')
 
     expect(prisma.notification.update).toHaveBeenNthCalledWith(1, {
       where: { id: 'ntf_123' },
@@ -156,6 +232,16 @@ describe('NotificationWorkerService', () => {
       'console',
       'sent',
     )
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: 'notification.delivery.succeeded',
+        notificationId: 'ntf_123',
+        requestId: 'req-123',
+        channel: NotificationChannel.email,
+        provider: 'console',
+        message: 'Notification delivered successfully',
+      }),
+    )
   })
 
   it('stores the provider failure, increments attempts, and rethrows when delivery fails', async () => {
@@ -200,6 +286,14 @@ describe('NotificationWorkerService', () => {
       NotificationChannel.sms,
       'console',
       'failed',
+    )
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: 'notification.delivery.failed',
+        notificationId: 'ntf_456',
+        outcome: 'retrying',
+        message: 'Notification delivery attempt failed',
+      }),
     )
   })
 
