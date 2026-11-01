@@ -218,16 +218,26 @@ jobs:
         env:
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           PORT: 5502
+          EMAIL_PROVIDER: sendgrid
+          SENDGRID_API_KEY: smoke-test-only
+          SENDGRID_FROM_EMAIL: no-reply@example.test
+          NOTIFICATION_API_KEY: smoke-test-service-key-0000000000000000
+          NOTIFICATION_PAYLOAD_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
         run: |
-          # 1. Run the container in detached mode using host networking
-          container_id=$(docker run --detach --rm --network host \
+          # Keep the container until the trap runs so startup logs remain available.
+          container_id=$(docker run --detach --network host \
             -e DATABASE_URL="$DATABASE_URL" \
             -e JWT_SECRET="$JWT_SECRET" \
             -e PORT=$PORT \
+            -e EMAIL_PROVIDER="$EMAIL_PROVIDER" \
+            -e SENDGRID_API_KEY="$SENDGRID_API_KEY" \
+            -e SENDGRID_FROM_EMAIL="$SENDGRID_FROM_EMAIL" \
+            -e NOTIFICATION_API_KEY="$NOTIFICATION_API_KEY" \
+            -e NOTIFICATION_PAYLOAD_ENCRYPTION_KEY="$NOTIFICATION_PAYLOAD_ENCRYPTION_KEY" \
             local/ms-notification:${{ github.sha }})
 
-          # Ensure the container stops even if subsequent steps fail
-          trap "docker stop $container_id" EXIT
+          # Remove the container after success or failure.
+          trap 'docker rm --force "$container_id" >/dev/null' EXIT
 
           # 2. Poll until the container and server are responsive
           echo "Waiting for ms-notification container to boot on port $PORT..."
