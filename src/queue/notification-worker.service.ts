@@ -27,79 +27,162 @@ export class NotificationWorkerService {
     private readonly metrics: MetricsService,
   ) {}
 
-  async process(notificationId: string, isFinalAttempt = false): Promise<void> {
-    const notification = await this.prisma.notification.findUnique({
-      where: { id: notificationId },
-    })
-    if (!notification) {
-      throw new NotificationNotFoundException(notificationId)
+  async process(
+    notificationId: string,
+    isFinalAttempt = false,
+    requestId?: string,
+  ): Promise<void> {
+    let activity: Record<string, unknown> = {
+      notificationId,
+      requestId,
+      finalAttempt: isFinalAttempt,
     }
-    if (notification.status === NotificationStatus.sent) {
-      this.logger.warn(`Notification ${notificationId} already sent — skipping`)
-      return
-    }
+    let stage = 'load_notification'
 
-    await this.prisma.notification.update({
-      where: { id: notificationId },
-      data: { status: NotificationStatus.processing },
-    })
+    try {
+      const notification = await this.prisma.notification.findUnique({
+        where: { id: notificationId },
+      })
+      if (!notification) {
+        throw new NotificationNotFoundException(notificationId)
+      }
+      activity = {
+        ...activity,
+        channel: notification.channel,
+        region: notification.region,
+        attempt: notification.attempts + 1,
+      }
+      if (notification.status === NotificationStatus.sent) {
+        this.logger.warn({
+          ...activity,
+          event: 'notification.delivery.skipped',
+          message: 'Notification was already sent',
+        })
+        return
+      }
 
-    const provider = this.providers.resolve(
-      notification.channel,
-      notification.platform,
-    )
-    if (!provider) {
-      await this.markFailed(
-        notificationId,
-        `No provider configured for channel=${notification.channel}`,
-        isFinalAttempt,
-      )
-      this.metrics.incrementDelivered(
-        notification.channel,
-        'unavailable',
-        'failed',
-      )
-      throw new ProviderUnavailableException(
+      this.logger.log({
+        ...activity,
+        event: 'notification.delivery.started',
+        message: 'Notification delivery attempt started',
+      })
+
+      stage = 'mark_processing'
+      await this.prisma.notification.update({
+        where: { id: notificationId },
+        data: { status: NotificationStatus.processing },
+      })
+
+      stage = 'resolve_provider'
+      const provider = this.providers.resolve(
         notification.channel,
         notification.platform,
       )
-    }
+      if (!provider) {
+        await this.markFailed(
+          notificationId,
+          `No provider configured for channel=${notification.channel}`,
+          isFinalAttempt,
+        )
+        this.metrics.incrementDelivered(
+          notification.channel,
+          'unavailable',
+          'failed',
+        )
+        throw new ProviderUnavailableException(
+          notification.channel,
+          notification.platform,
+        )
+      }
+      activity = { ...activity, provider: provider.name }
 
-    let recipient: string
-    try {
-      recipient = await this.resolveRecipient(
-        notification.userId,
-        notification.channel,
-      )
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Recipient resolution failed'
-      await this.markFailed(notificationId, message, isFinalAttempt)
-      this.metrics.incrementDelivered(
-        notification.channel,
-        provider.name,
-        'failed',
-      )
-      throw error
-    }
+      let recipient: string
+      try {
+        stage = 'resolve_recipient'
+        recipient = await this.resolveRecipient(
+          notification.userId,
+          notification.channel,
+        )
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'Recipient resolution failed'
+        await this.markFailed(notificationId, message, isFinalAttempt)
+        this.metrics.incrementDelivered(
+          notification.channel,
+          provider.name,
+          'failed',
+        )
+        throw error
+      }
 
-    const payload: ProviderPayload = {
-      channel: notification.channel,
-      platform: notification.platform,
-      recipient,
-      templateId: notification.templateId,
-      content: {
-        subject: `Notification: ${notification.templateId}`,
-        body: JSON.stringify(notification.payload ?? {}),
-      },
-    }
+      const payload: ProviderPayload = {
+        channel: notification.channel,
+        platform: notification.platform,
+        recipient,
+        templateId: notification.templateId,
+        content: {
+          subject: `Notification: ${notification.templateId}`,
+          body: JSON.stringify(notification.payload ?? {}),
+        },
+      }
 
-    let result: ProviderResult
-    try {
-      result = await provider.send(payload)
-    } catch (error) {
-      const reason =
-        error instanceof Error ? error.message : 'Unknown provider error'
+      let result: ProviderResult
+      try {
+        stage = 'send'
+        result = await provider.send(payload)
+      } catch (error) {
+        const reason =
+          error instanceof Error ? error.message : 'Unknown provider error'
+        await this.markFailed(notificationId, reason, isFinalAttempt)
+        this.metrics.incrementDelivered(
+          notification.channel,
+          provider.name,
+          'failed',
+        )
+        throw new ProviderDeliveryFailedException(provider.name, reason)
+      }
+
+      if (result.success) {
+        activity = { ...activity, deliveryOutcome: 'sent' }
+        stage = 'persist_sent'
+        await this.prisma.notification.update({
+          where: { id: notificationId },
+          data: {
+            status: NotificationStatus.sent,
+            provider: provider.name,
+            providerMessageId: result.providerMessageId,
+            sentAt: new Date(),
+            attempts: { increment: 1 },
+          },
+        })
+        stage = 'persist_audit'
+        await this.audit.record({
+          actor: 'worker',
+          action: 'notification.sent',
+          resourceType: 'notification',
+          resourceId: notificationId,
+          status: 'sent',
+          region: notification.region,
+          metadata: {
+            provider: provider.name,
+            channel: notification.channel,
+          },
+        })
+        this.metrics.incrementDelivered(
+          notification.channel,
+          provider.name,
+          'sent',
+        )
+        this.logger.log({
+          ...activity,
+          event: 'notification.delivery.succeeded',
+          message: 'Notification delivered successfully',
+        })
+        return
+      }
+
+      const reason = result.error ?? 'Unknown provider error'
+      stage = 'persist_failure'
       await this.markFailed(notificationId, reason, isFinalAttempt)
       this.metrics.incrementDelivered(
         notification.channel,
@@ -107,48 +190,26 @@ export class NotificationWorkerService {
         'failed',
       )
       throw new ProviderDeliveryFailedException(provider.name, reason)
-    }
-
-    if (result.success) {
-      await this.prisma.notification.update({
-        where: { id: notificationId },
-        data: {
-          status: NotificationStatus.sent,
-          provider: provider.name,
-          providerMessageId: result.providerMessageId,
-          sentAt: new Date(),
-          attempts: { increment: 1 },
-        },
+    } catch (error) {
+      const deliverySucceeded = activity.deliveryOutcome === 'sent'
+      this.logger.error({
+        ...activity,
+        event: deliverySucceeded
+          ? 'notification.processing.failed'
+          : 'notification.delivery.failed',
+        stage,
+        errorType: error instanceof Error ? error.name : 'UnknownError',
+        outcome: deliverySucceeded
+          ? 'sent'
+          : isFinalAttempt
+            ? 'failed'
+            : 'retrying',
+        message: deliverySucceeded
+          ? 'Notification delivered but processing failed'
+          : 'Notification delivery attempt failed',
       })
-      await this.audit.record({
-        actor: 'worker',
-        action: 'notification.sent',
-        resourceType: 'notification',
-        resourceId: notificationId,
-        status: 'sent',
-        region: notification.region,
-        metadata: {
-          provider: provider.name,
-          channel: notification.channel,
-        },
-      })
-      this.metrics.incrementDelivered(
-        notification.channel,
-        provider.name,
-        'sent',
-      )
-      return
+      throw error
     }
-
-    const reason = result.error ?? 'Unknown provider error'
-    await this.markFailed(notificationId, reason, isFinalAttempt)
-    this.metrics.incrementDelivered(
-      notification.channel,
-      provider.name,
-      'failed',
-    )
-    // Throwing triggers BullMQ retry with exponential backoff (see queue.module.ts).
-    throw new ProviderDeliveryFailedException(provider.name, reason)
   }
 
   private async markFailed(

@@ -43,9 +43,48 @@ describe('AuditService', () => {
       },
     })
     expect(logSpy).toHaveBeenCalledWith(
-      '[audit] worker notification.sent notification:ntf_123 -> sent',
+      expect.objectContaining({
+        event: 'audit.recorded',
+        action: 'notification.sent',
+        resourceId: 'ntf_123',
+        status: 'sent',
+        message: 'Audit activity persisted',
+      }),
     )
-
     logSpy.mockRestore()
+  })
+
+  it('logs and rethrows audit persistence failures', async () => {
+    const failure = new Error('database connection failed')
+    const prisma = {
+      auditLog: {
+        create: jest
+          .fn<(args: any) => Promise<unknown>>()
+          .mockRejectedValue(failure),
+      },
+    }
+    const errorSpy = jest
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation(() => undefined)
+    const service = new AuditService(prisma as unknown as PrismaService)
+
+    await expect(
+      service.record({
+        actor: 'worker',
+        action: 'notification.sent',
+        resourceType: 'notification',
+        resourceId: 'ntf_123',
+        status: 'sent',
+        region: 'US',
+      }),
+    ).rejects.toBe(failure)
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: 'audit.record.failed',
+        errorType: 'Error',
+        message: 'Failed to persist audit activity',
+      }),
+    )
+    errorSpy.mockRestore()
   })
 })

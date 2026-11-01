@@ -36,8 +36,8 @@ const PRISMA_ERROR_CODE: Record<string, string> = {
 /**
  * Normalizes every unhandled error (Nest HttpException, Prisma errors, or
  * unexpected runtime errors) into a single, predictable JSON shape so API
- * consumers never have to branch on error source. Never leaks internal
- * stack traces or raw driver messages to clients — those are logged only.
+ * consumers never have to branch on error source. Internal stack traces and
+ * raw driver messages are neither returned to clients nor written to logs.
  */
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
@@ -53,19 +53,29 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       randomUUID()
 
     const { status, errorCode, message } = this.resolve(exception)
+    const requestRoute: unknown = Reflect.get(request, 'route')
+    const route =
+      typeof requestRoute === 'object' &&
+      requestRoute !== null &&
+      'path' in requestRoute &&
+      typeof requestRoute.path === 'string'
+        ? requestRoute.path
+        : 'unmatched'
+    const logFields = {
+      event: 'http.request.failed',
+      requestId,
+      method: request.method,
+      route,
+      statusCode: status,
+      errorCode,
+      errorType: exception instanceof Error ? exception.name : 'UnknownError',
+      message: 'HTTP request failed',
+    }
 
     if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
-      const detail =
-        exception instanceof Error
-          ? (exception.stack ?? exception.message)
-          : String(exception)
-      this.logger.error(
-        `[${requestId}] ${request.method} ${request.url} -> ${status}: ${detail}`,
-      )
+      this.logger.error(logFields)
     } else {
-      this.logger.warn(
-        `[${requestId}] ${request.method} ${request.url} -> ${status}: ${String(message)}`,
-      )
+      this.logger.warn(logFields)
     }
 
     const body: ErrorResponseBody = {

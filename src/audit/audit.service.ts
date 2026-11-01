@@ -19,20 +19,42 @@ export class AuditService {
   constructor(private readonly prisma: PrismaService) {}
 
   async record(entry: AuditEntry): Promise<void> {
-    // Store pseudonymized metadata only — never raw PHI.
-    await this.prisma.auditLog.create({
-      data: {
+    try {
+      // Store pseudonymized metadata only — never raw PHI.
+      await this.prisma.auditLog.create({
+        data: {
+          actor: entry.actor,
+          action: entry.action,
+          resourceType: entry.resourceType,
+          resourceId: entry.resourceId,
+          status: entry.status,
+          region: entry.region,
+          metadata: entry.metadata,
+        },
+      })
+      this.logger.log({
+        event: 'audit.recorded',
         actor: entry.actor,
         action: entry.action,
         resourceType: entry.resourceType,
         resourceId: entry.resourceId,
         status: entry.status,
         region: entry.region,
-        metadata: entry.metadata,
-      },
-    })
-    this.logger.log(
-      `[audit] ${entry.actor} ${entry.action} ${entry.resourceType}:${entry.resourceId} -> ${entry.status}`,
-    )
+        message: 'Audit activity persisted',
+      })
+    } catch (error) {
+      this.logger.error({
+        event: 'audit.record.failed',
+        actor: entry.actor,
+        action: entry.action,
+        resourceType: entry.resourceType,
+        resourceId: entry.resourceId,
+        status: entry.status,
+        region: entry.region,
+        errorType: error instanceof Error ? error.name : 'UnknownError',
+        message: 'Failed to persist audit activity',
+      })
+      throw error
+    }
   }
 }

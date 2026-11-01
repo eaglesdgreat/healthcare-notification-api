@@ -1,4 +1,5 @@
 import { jest } from '@jest/globals'
+import { Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { Prisma } from '@/generated/prisma/client.js'
 import {
@@ -49,6 +50,8 @@ describe('NotificationService', () => {
   let metrics: {
     incrementEnqueued: jest.MockedFunction<(channel: string) => void>
   }
+  let logSpy: jest.SpiedFunction<typeof Logger.prototype.log>
+  let errorSpy: jest.SpiedFunction<typeof Logger.prototype.error>
   let service: NotificationService
 
   beforeEach(() => {
@@ -64,6 +67,12 @@ describe('NotificationService', () => {
     pushIosQueue = { add: jest.fn() }
     pushAndroidQueue = { add: jest.fn() }
     metrics = { incrementEnqueued: jest.fn() }
+    logSpy = jest
+      .spyOn(Logger.prototype, 'log')
+      .mockImplementation(() => undefined)
+    errorSpy = jest
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation(() => undefined)
 
     service = new NotificationService(
       prisma as unknown as PrismaService,
@@ -86,6 +95,10 @@ describe('NotificationService', () => {
     )
   })
 
+  afterEach(() => {
+    jest.restoreAllMocks()
+  })
+
   it('returns an existing notification for a duplicate idempotency key', async () => {
     const existing = { id: 'ntf_123', status: NotificationStatus.sent }
     prisma.notification.findUnique.mockResolvedValue(existing)
@@ -95,6 +108,14 @@ describe('NotificationService', () => {
       status: NotificationStatus.sent,
     })
     expect(prisma.notification.create).not.toHaveBeenCalled()
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: 'notification.enqueue.duplicate',
+        notificationId: 'ntf_123',
+        message:
+          'Duplicate notification request returned existing notification',
+      }),
+    )
   })
 
   it('creates a queued notification and enqueues it on the correct email queue', async () => {
@@ -105,7 +126,7 @@ describe('NotificationService', () => {
     })
     emailQueue.add.mockResolvedValue({ id: 'job-1' })
 
-    const result = await service.send(dto, 'idem-456')
+    const result = await service.send(dto, 'idem-456', 'req-456')
 
     expect(result).toEqual({ id: 'ntf_456', status: NotificationStatus.queued })
 
@@ -136,10 +157,24 @@ describe('NotificationService', () => {
       { jobId: string },
     ]
     expect(queueArgs[0]).toBe('send-notification')
-    expect(queueArgs[1]).toEqual({ notificationId: 'ntf_456' })
+    expect(queueArgs[1]).toEqual({
+      notificationId: 'ntf_456',
+      requestId: 'req-456',
+    })
     expect(queueArgs[2]).toMatchObject({ jobId: 'ntf_456' })
     expect(metrics.incrementEnqueued).toHaveBeenCalledWith(
       NotificationChannel.email,
+    )
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: 'notification.enqueue.succeeded',
+        notificationId: 'ntf_456',
+        channel: NotificationChannel.email,
+        message: 'Notification accepted and queued',
+      }),
+    )
+    expect(JSON.stringify(logSpy.mock.calls)).not.toContain(
+      '2026-09-10T10:00:00Z',
     )
   })
 
@@ -214,5 +249,12 @@ describe('NotificationService', () => {
     await expect(
       service.send(unsupportedDto, 'idem-unsupported'),
     ).rejects.toThrow('Unsupported channel: carrier-pigeon')
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: 'notification.enqueue.failed',
+        errorType: 'UnsupportedChannelException',
+        message: 'Failed to enqueue notification',
+      }),
+    )
   })
 })

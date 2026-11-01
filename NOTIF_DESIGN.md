@@ -285,11 +285,15 @@ investigation.
   caller-supplied value). The same value is returned in the response and
   included in each structured log line, so an API error can be correlated with
   its server-side log entries and downstream queue/worker records.
+- HTTP request outcomes, notification enqueue/deduplication, delivery attempts,
+  and audit persistence outcomes are recorded as structured events. The
+  request ID is carried with the BullMQ job for API-to-worker correlation.
+- Automatic request logging includes health checks and metrics scrapes as well
+  as application routes, so infrastructure traffic is visible too.
 - Sensitive values are redacted before logging: authorization headers, cookies,
-  and notification payload bodies (which may contain PHI). Logs record
-  identifiers and outcomes — never message bodies or contact addresses.
-- Health-check and metrics-scrape traffic is excluded from automatic request
-  logging to avoid noisy telemetry.
+  idempotency keys, request URLs, and notification payload bodies (which may
+  contain PHI). Logs record safe route patterns, identifiers, and outcomes —
+  never message bodies or contact addresses.
 
 ### 16.2 Metrics and Readiness
 
