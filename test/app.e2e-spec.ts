@@ -12,13 +12,16 @@ import { HealthController } from '@/health/health.controller.js'
 import { NotificationController } from '@/notification/notification.controller.js'
 import { NotificationService } from '@/notification/notification.service.js'
 import { NotificationStatus } from '@/generated/prisma/enums.js'
+import { ConfigService } from '@nestjs/config'
 import { PrismaService } from '@/prisma/prisma.service.js'
 import { GlobalExceptionFilter } from '@/common/filters/global-exception.filter.js'
 import { RequestValidationException } from '@/common/exceptions/notification.exceptions.js'
+import { NotificationApiKeyGuard } from '@/notification/notification-api-key.guard.js'
 
 describe('Notification API (e2e)', () => {
+  const serviceApiKey = 't'.repeat(40)
   let app: INestApplication
-  let notificationService: { send: jest.Mock }
+  let notificationService: { send: jest.Mock; upsertChannel: jest.Mock }
   let prisma: { notification: { findUnique: jest.Mock } }
   let healthCheck: { check: jest.Mock }
 
@@ -28,6 +31,9 @@ describe('Notification API (e2e)', () => {
         id: 'ntf_123',
         status: NotificationStatus.queued,
       }),
+      upsertChannel: jest
+        .fn<() => Promise<void>>()
+        .mockResolvedValue(undefined),
     }
     prisma = {
       notification: {
@@ -51,6 +57,11 @@ describe('Notification API (e2e)', () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       controllers: [HealthController, NotificationController],
       providers: [
+        NotificationApiKeyGuard,
+        {
+          provide: ConfigService,
+          useValue: { get: () => serviceApiKey },
+        },
         {
           provide: HealthCheckService,
           useValue: healthCheck,
@@ -115,6 +126,7 @@ describe('Notification API (e2e)', () => {
     const server = app.getHttpServer() as Server
     return request(server)
       .post('/api/notifications')
+      .set('x-api-key', serviceApiKey)
       .send({
         userId: 'user-1',
         channel: 'email',
@@ -141,10 +153,40 @@ describe('Notification API (e2e)', () => {
       })
   })
 
+  it('/api/notifications rejects missing service credentials', () => {
+    const server = app.getHttpServer() as Server
+    return request(server)
+      .post('/api/notifications')
+      .set('Idempotency-Key', 'idem-unauthorized')
+      .send({})
+      .expect(401)
+  })
+
+  it('/api/notifications/channels (POST) registers an email delivery channel', () => {
+    const server = app.getHttpServer() as Server
+    return request(server)
+      .post('/api/notifications/channels')
+      .set('x-api-key', serviceApiKey)
+      .send({
+        userId: 'user-1',
+        channel: 'email',
+        address: 'person@example.test',
+      })
+      .expect(204)
+      .expect(() => {
+        expect(notificationService.upsertChannel).toHaveBeenCalledWith({
+          userId: 'user-1',
+          channel: 'email',
+          address: 'person@example.test',
+        })
+      })
+  })
+
   it('/api/notifications (POST) rejects invalid payloads with a normalized validation error body', () => {
     const server = app.getHttpServer() as Server
     return request(server)
       .post('/api/notifications')
+      .set('x-api-key', serviceApiKey)
       .set('Idempotency-Key', 'idem-invalid')
       .send({
         userId: 'user-1',
@@ -173,6 +215,7 @@ describe('Notification API (e2e)', () => {
     const server = app.getHttpServer() as Server
     return request(server)
       .post('/api/notifications')
+      .set('x-api-key', serviceApiKey)
       .set('Idempotency-Key', 'idem-123')
       .send({
         userId: 'user-1',
@@ -194,6 +237,7 @@ describe('Notification API (e2e)', () => {
     const server = app.getHttpServer() as Server
     return request(server)
       .get('/api/notifications/ntf_123')
+      .set('x-api-key', serviceApiKey)
       .expect(200)
       .expect(({ body }) => {
         expect(body).toEqual({
@@ -210,6 +254,7 @@ describe('Notification API (e2e)', () => {
     const server = app.getHttpServer() as Server
     return request(server)
       .get('/api/notifications/does-not-exist')
+      .set('x-api-key', serviceApiKey)
       .expect(404)
       .expect(({ body }) => {
         expect(body).toMatchObject({

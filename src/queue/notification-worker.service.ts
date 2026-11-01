@@ -1,4 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
+import { createDecipheriv } from 'node:crypto'
 import {
   NotificationChannel,
   NotificationStatus,
@@ -25,6 +27,7 @@ export class NotificationWorkerService {
     private readonly providers: ProviderRegistry,
     private readonly audit: AuditService,
     private readonly metrics: MetricsService,
+    private readonly config: ConfigService,
   ) {}
 
   async process(
@@ -115,15 +118,17 @@ export class NotificationWorkerService {
         throw error
       }
 
+      const content = this.renderContent(
+        notification.templateId,
+        notification.payload,
+        notification.userId,
+      )
       const payload: ProviderPayload = {
         channel: notification.channel,
         platform: notification.platform,
         recipient,
         templateId: notification.templateId,
-        content: {
-          subject: `Notification: ${notification.templateId}`,
-          body: JSON.stringify(notification.payload ?? {}),
-        },
+        content,
       }
 
       let result: ProviderResult
@@ -239,5 +244,78 @@ export class NotificationWorkerService {
       throw new RecipientNotFoundException(userId, channel)
     }
     return userChannel.address ?? userChannel.deviceToken ?? ''
+  }
+
+  private renderContent(templateId: string, payload: unknown, userId: string) {
+    if (templateId !== 'auth-account-activation') {
+      return {
+        subject: `Notification: ${templateId}`,
+        body: JSON.stringify(payload ?? {}),
+      }
+    }
+
+    if (!this.isRecord(payload) || payload.encrypted !== true) {
+      throw new Error('Activation notification payload is not encrypted')
+    }
+    const encryptionKey = this.config.get<string>(
+      'NOTIFICATION_PAYLOAD_ENCRYPTION_KEY',
+    )
+    if (!encryptionKey) {
+      throw new Error('Notification payload encryption is not configured')
+    }
+    const key = Buffer.from(encryptionKey, 'base64')
+    if (key.length !== 32) {
+      throw new Error('Notification payload encryption key is invalid')
+    }
+    const { algorithm, iv, authTag, ciphertext } = payload
+    if (
+      algorithm !== 'aes-256-gcm' ||
+      typeof iv !== 'string' ||
+      typeof authTag !== 'string' ||
+      typeof ciphertext !== 'string'
+    ) {
+      throw new Error('Activation notification payload is invalid')
+    }
+
+    let decoded: unknown
+    try {
+      const decipher = createDecipheriv(
+        'aes-256-gcm',
+        key,
+        Buffer.from(iv, 'base64'),
+      )
+      decipher.setAuthTag(Buffer.from(authTag, 'base64'))
+      const plaintext = Buffer.concat([
+        decipher.update(Buffer.from(ciphertext, 'base64')),
+        decipher.final(),
+      ]).toString('utf8')
+      decoded = JSON.parse(plaintext)
+    } catch {
+      throw new Error('Activation notification payload could not be decrypted')
+    }
+    if (
+      !this.isRecord(decoded) ||
+      decoded.userId !== userId ||
+      typeof decoded.activationToken !== 'string' ||
+      !/^[a-f0-9]{64}$/i.test(decoded.activationToken) ||
+      typeof decoded.expiresAt !== 'string' ||
+      !Number.isFinite(Date.parse(decoded.expiresAt))
+    ) {
+      throw new Error('Activation notification payload is invalid')
+    }
+
+    return {
+      subject: 'Activate your healthcare account',
+      body: [
+        'Use the following activation token to activate your account:',
+        decoded.activationToken,
+        '',
+        `This token expires at ${new Date(decoded.expiresAt).toISOString()}.`,
+      ].join('\n'),
+    }
+  }
+
+  private isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value)
   }
 }

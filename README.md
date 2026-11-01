@@ -56,19 +56,21 @@ pnpm run start:dev
 
 ## API
 
-| Method | Path                     | Description                              |
-| ------ | ------------------------ | ---------------------------------------- |
-| POST   | `/api/notifications`     | Enqueue a notification (Idempotency-Key) |
-| GET    | `/api/notifications/:id` | Delivery status                          |
-| GET    | `/api/health/live`       | Liveness probe                           |
-| GET    | `/api/health/ready`      | Readiness probe (checks DB)              |
-| GET    | `/api/metrics`           | Prometheus metrics                       |
+| Method | Path                          | Description                                  |
+| ------ | ----------------------------- | -------------------------------------------- |
+| POST   | `/api/notifications`          | Enqueue a notification (Idempotency-Key)     |
+| POST   | `/api/notifications/channels` | Register or update a user's delivery channel |
+| GET    | `/api/notifications/:id`      | Delivery status                              |
+| GET    | `/api/health/live`            | Liveness probe                               |
+| GET    | `/api/health/ready`           | Readiness probe (checks DB)                  |
+| GET    | `/api/metrics`                | Prometheus metrics                           |
 
 Example:
 
 ```bash
 curl -X POST http://localhost:3000/api/notifications \
   -H "Content-Type: application/json" \
+  -H "x-api-key: <service-secret>" \
   -H "Idempotency-Key: 6f2b3c8e-9b1a-4f0a-8d2e-1a2b3c4d5e6f" \
   -d '{
     "userId": "user-1",
@@ -78,6 +80,14 @@ curl -X POST http://localhost:3000/api/notifications \
     "legalBasis": "treatment"
   }'
 ```
+
+All notification endpoints require an `x-api-key` service credential of at
+least 32 bytes. Configure `NOTIFICATION_API_KEY` in the notification service
+and the matching `NOTIFICATION_SERVICE_API_KEY` in each authorized caller.
+Activation-token payloads use AES-256-GCM; configure the same base64-encoded
+32-byte `NOTIFICATION_PAYLOAD_ENCRYPTION_KEY` in auth and notification. Keep
+both values in a secrets manager and rotate them through a coordinated
+deployment. The key must not be stored in the notification database.
 
 ## Structure
 
@@ -204,6 +214,7 @@ into a single consistent JSON shape:
 
 Providers implement `NotificationProvider` and are resolved by channel/platform
 at send time via `ProviderRegistry`. A `console` provider is wired by default
-for local development. Reference implementations are provided for SendGrid
-(email), Twilio (SMS), FCM (Android push), and APNs (iOS push) — see
-`src/providers/`.
+for local development. SendGrid email delivery is implemented and selected by
+`EMAIL_PROVIDER=sendgrid`; configure `SENDGRID_API_KEY` and
+`SENDGRID_FROM_EMAIL`. Production startup fails unless this real provider is
+selected. SMS, FCM, and APNs adapters are not currently wired.

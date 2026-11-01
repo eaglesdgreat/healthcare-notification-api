@@ -14,6 +14,7 @@ import { QUEUE_NAMES } from '@/queue/queue.constants.js'
 import { SendNotificationDto } from '@/notification/dto/send-notification.dto.js'
 import { UnsupportedChannelException } from '@/common/exceptions/notification.exceptions.js'
 import { MetricsService } from '@/common/metrics/metrics.service.js'
+import { UpsertUserChannelDto } from '@/notification/dto/upsert-user-channel.dto.js'
 
 export interface SendResult {
   id: string
@@ -38,6 +39,27 @@ export class NotificationService {
     private readonly metrics: MetricsService,
   ) {}
 
+  async upsertChannel(dto: UpsertUserChannelDto): Promise<void> {
+    const platform = dto.platform ?? dto.channel
+    await this.prisma.userChannel.upsert({
+      where: {
+        userId_channel_platform: {
+          userId: dto.userId,
+          channel: dto.channel,
+          platform,
+        },
+      },
+      create: {
+        userId: dto.userId,
+        channel: dto.channel,
+        platform,
+        address: dto.address,
+        verifiedAt: null,
+      },
+      update: { address: dto.address, verifiedAt: null },
+    })
+  }
+
   async send(
     dto: SendNotificationDto,
     idempotencyKey: string,
@@ -52,6 +74,9 @@ export class NotificationService {
         where: { dedupKey: idempotencyKey },
       })
       if (existing) {
+        if (existing.status === NotificationStatus.queued) {
+          await this.queueNotification(existing, requestId)
+        }
         this.logDuplicate(existing.id, existing.status, dto.channel, requestId)
         return { id: existing.id, status: existing.status }
       }
@@ -73,15 +98,14 @@ export class NotificationService {
         },
       })
 
-      await this.queueFor(dto).add(
-        'send-notification',
-        { notificationId: notification.id, requestId },
+      await this.queueNotification(
         {
-          jobId: notification.id,
-          delay: dto.scheduledAt
-            ? this.delayUntil(new Date(dto.scheduledAt))
-            : undefined,
+          id: notification.id,
+          channel: dto.channel,
+          platform: dto.platform ?? null,
+          scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null,
         },
+        requestId,
       )
 
       this.metrics.incrementEnqueued(dto.channel)
@@ -110,6 +134,9 @@ export class NotificationService {
           throw lookupError
         }
         if (duplicate) {
+          if (duplicate.status === NotificationStatus.queued) {
+            await this.queueNotification(duplicate, requestId)
+          }
           this.logDuplicate(
             duplicate.id,
             duplicate.status,
@@ -154,7 +181,9 @@ export class NotificationService {
     })
   }
 
-  private queueFor(dto: SendNotificationDto): Queue<NotificationJobData> {
+  private queueFor(
+    dto: Pick<SendNotificationDto, 'channel' | 'platform'>,
+  ): Queue<NotificationJobData> {
     switch (dto.channel) {
       case NotificationChannel.email:
         return this.emailQueue
@@ -167,6 +196,30 @@ export class NotificationService {
       default:
         throw new UnsupportedChannelException(String(dto.channel))
     }
+  }
+
+  private queueNotification(
+    notification: {
+      id: string
+      channel: SendNotificationDto['channel']
+      platform: string | null
+      scheduledAt: Date | null
+    },
+    requestId?: string,
+  ): Promise<unknown> {
+    return this.queueFor({
+      channel: notification.channel,
+      platform: notification.platform ?? undefined,
+    }).add(
+      'send-notification',
+      { notificationId: notification.id, requestId },
+      {
+        jobId: notification.id,
+        delay: notification.scheduledAt
+          ? this.delayUntil(notification.scheduledAt)
+          : undefined,
+      },
+    )
   }
 
   private delayUntil(date: Date): number {

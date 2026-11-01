@@ -25,6 +25,9 @@ describe('NotificationService', () => {
       findUnique: jest.MockedFunction<(args: any) => Promise<any>>
       create: jest.MockedFunction<(args: any) => Promise<any>>
     }
+    userChannel: {
+      upsert: jest.MockedFunction<(args: any) => Promise<any>>
+    }
   }
   let config: { get: jest.MockedFunction<(key: string) => string> }
   let emailQueue: {
@@ -59,6 +62,9 @@ describe('NotificationService', () => {
       notification: {
         findUnique: jest.fn(),
         create: jest.fn(),
+      },
+      userChannel: {
+        upsert: jest.fn(),
       },
     }
     config = { get: jest.fn<(key: string) => string>(() => 'US') }
@@ -107,6 +113,7 @@ describe('NotificationService', () => {
       id: 'ntf_123',
       status: NotificationStatus.sent,
     })
+
     expect(prisma.notification.create).not.toHaveBeenCalled()
     expect(logSpy).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -116,6 +123,56 @@ describe('NotificationService', () => {
           'Duplicate notification request returned existing notification',
       }),
     )
+  })
+
+  it('re-enqueues a persisted notification when an idempotent retry finds it still queued', async () => {
+    prisma.notification.findUnique.mockResolvedValue({
+      id: 'ntf_retry',
+      status: NotificationStatus.queued,
+      channel: NotificationChannel.email,
+      platform: null,
+      scheduledAt: null,
+    })
+    emailQueue.add.mockResolvedValue({ id: 'ntf_retry' })
+
+    await expect(service.send(dto, 'idem-retry', 'req-retry')).resolves.toEqual(
+      {
+        id: 'ntf_retry',
+        status: NotificationStatus.queued,
+      },
+    )
+    expect(emailQueue.add).toHaveBeenCalledWith(
+      'send-notification',
+      { notificationId: 'ntf_retry', requestId: 'req-retry' },
+      { jobId: 'ntf_retry', delay: undefined },
+    )
+    expect(prisma.notification.create).not.toHaveBeenCalled()
+  })
+
+  it('upserts delivery channels without a find-then-create race', async () => {
+    await service.upsertChannel({
+      userId: 'user-1',
+      channel: NotificationChannel.email,
+      address: 'person@example.test',
+    })
+
+    expect(prisma.userChannel.upsert).toHaveBeenCalledWith({
+      where: {
+        userId_channel_platform: {
+          userId: 'user-1',
+          channel: NotificationChannel.email,
+          platform: NotificationChannel.email,
+        },
+      },
+      create: {
+        userId: 'user-1',
+        channel: NotificationChannel.email,
+        platform: NotificationChannel.email,
+        address: 'person@example.test',
+        verifiedAt: null,
+      },
+      update: { address: 'person@example.test', verifiedAt: null },
+    })
   })
 
   it('creates a queued notification and enqueues it on the correct email queue', async () => {

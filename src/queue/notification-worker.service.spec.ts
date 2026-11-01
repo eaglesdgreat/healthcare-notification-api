@@ -1,5 +1,7 @@
 import { jest } from '@jest/globals'
 import { Logger } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
+import { createCipheriv, randomBytes } from 'node:crypto'
 import {
   NotificationChannel,
   NotificationStatus,
@@ -7,7 +9,10 @@ import {
 import { AuditService } from '@/audit/audit.service.js'
 import { PrismaService } from '@/prisma/prisma.service.js'
 import { ProviderRegistry } from '@/providers/provider-registry.service.js'
-import type { ProviderResult } from '@/providers/notification-provider.interface.js'
+import type {
+  ProviderPayload,
+  ProviderResult,
+} from '@/providers/notification-provider.interface.js'
 import {
   ProviderUnavailableException,
   RecipientNotFoundException,
@@ -37,6 +42,7 @@ describe('NotificationWorkerService', () => {
   let warnSpy: jest.SpiedFunction<typeof Logger.prototype.warn>
   let errorSpy: jest.SpiedFunction<typeof Logger.prototype.error>
   let service: NotificationWorkerService
+  const config = { get: jest.fn() }
 
   beforeEach(() => {
     prisma = {
@@ -67,6 +73,7 @@ describe('NotificationWorkerService', () => {
       metrics as unknown as ConstructorParameters<
         typeof NotificationWorkerService
       >[3],
+      config as unknown as ConfigService,
     )
   })
 
@@ -178,6 +185,7 @@ describe('NotificationWorkerService', () => {
       status: NotificationStatus.queued,
       region: 'US',
     })
+
     providers.resolve.mockReturnValue(provider)
     prisma.userChannel.findFirst.mockResolvedValue({
       address: 'patient@example.com',
@@ -242,6 +250,87 @@ describe('NotificationWorkerService', () => {
         message: 'Notification delivered successfully',
       }),
     )
+  })
+
+  it('decrypts activation payloads only to produce a plain-text email', async () => {
+    const key = Buffer.alloc(32, 9)
+    config.get.mockReturnValue(key.toString('base64'))
+    const iv = randomBytes(12)
+    const cipher = createCipheriv('aes-256-gcm', key, iv)
+    const ciphertext = Buffer.concat([
+      cipher.update(
+        JSON.stringify({
+          userId: 'user-activation',
+          activationToken: 'c'.repeat(64),
+          expiresAt: '2026-07-01T10:00:00.000Z',
+        }),
+        'utf8',
+      ),
+      cipher.final(),
+    ])
+    const provider = {
+      name: 'sendgrid',
+      send: jest
+        .fn<(payload: ProviderPayload) => Promise<ProviderResult>>()
+        .mockResolvedValue({
+          success: true,
+          providerMessageId: 'message-1',
+        }),
+    }
+    prisma.notification.findUnique.mockResolvedValue({
+      id: 'ntf_activation',
+      userId: 'user-activation',
+      channel: NotificationChannel.email,
+      platform: null,
+      templateId: 'auth-account-activation',
+      payload: {
+        encrypted: true,
+        algorithm: 'aes-256-gcm',
+        iv: iv.toString('base64'),
+        authTag: cipher.getAuthTag().toString('base64'),
+        ciphertext: ciphertext.toString('base64'),
+      },
+      status: NotificationStatus.queued,
+      attempts: 0,
+      region: 'US',
+    })
+    providers.resolve.mockReturnValue(provider)
+    prisma.userChannel.findFirst.mockResolvedValue({
+      address: 'patient@example.com',
+    })
+
+    await service.process('ntf_activation')
+
+    const sentContent = provider.send.mock.calls[0]?.[0].content
+    expect(sentContent.subject).toBe('Activate your healthcare account')
+    expect(sentContent.body).toContain('c'.repeat(64))
+    expect(sentContent.body).not.toContain('<html')
+    expect(JSON.stringify(logSpy.mock.calls)).not.toContain('c'.repeat(64))
+  })
+
+  it('refuses activation payloads that are not encrypted', async () => {
+    prisma.notification.findUnique.mockResolvedValue({
+      id: 'ntf_plaintext',
+      userId: 'user-activation',
+      channel: NotificationChannel.email,
+      platform: null,
+      templateId: 'auth-account-activation',
+      payload: { activationToken: 'c'.repeat(64) },
+      status: NotificationStatus.queued,
+      attempts: 0,
+      region: 'US',
+    })
+    const provider = { name: 'sendgrid', send: jest.fn() }
+    providers.resolve.mockReturnValue(provider)
+    prisma.userChannel.findFirst.mockResolvedValue({
+      address: 'patient@example.com',
+    })
+
+    await expect(service.process('ntf_plaintext')).rejects.toThrow(
+      'Activation notification payload is not encrypted',
+    )
+    expect(provider.send).not.toHaveBeenCalled()
+    expect(JSON.stringify(errorSpy.mock.calls)).not.toContain('c'.repeat(64))
   })
 
   it('stores the provider failure, increments attempts, and rethrows when delivery fails', async () => {
