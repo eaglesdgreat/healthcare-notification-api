@@ -6,8 +6,9 @@ with **HIPAA + GDPR** compliance across **US and EU** regions.
 
 > **Implementation status:** this document describes the target architecture;
 > the repository is currently an MVP scaffold, not a production-ready or
-> HIPAA/GDPR-compliant service. Authentication, consent/opt-out enforcement,
-> template rendering, verified-recipient enforcement, encryption/tokenization,
+> HIPAA/GDPR-compliant service. Internal API-key authentication, encrypted
+> auth-activation payloads, and a basic plain-text activation email are now
+> implemented. Consent/opt-out enforcement, verified-recipient enforcement,
 > regional isolation, delivery webhooks, dead-letter handling, and production
 > observability are not implemented yet. Do not send real patient data through
 > the current application.
@@ -135,6 +136,12 @@ with **HIPAA + GDPR** compliance across **US and EU** regions.
 
 ## 6. API Contracts
 
+The routes currently implemented are `POST /api/notifications/channels`,
+`POST /api/notifications`, and `GET /api/notifications/:id`. All require
+`x-api-key`; notification sends additionally require `Idempotency-Key`.
+Duplicate keys return the existing notification and status. The `/v1` API
+contract below is a target design, not the current runtime contract.
+
 ```
 POST /v1/notifications
   Headers:
@@ -162,7 +169,17 @@ GET /v1/notifications/:id → { id, status, attempts, providerMessageId }
 ## 7. Inter-Service Communication
 
 - **Inbound:** internal REST (JSON) now; gRPC optional later for hot paths.
-  Auth via API key / mTLS / OAuth2 client-credentials ("verified clients").
+  Routes require an `x-api-key` service credential of at least 32 bytes.
+  Production use also requires private-network access controls and TLS.
+- **Auth activation:** auth registers `(userId, email)` using
+  `POST /api/notifications/channels`, then queues
+  `POST /api/notifications` with `Idempotency-Key`. A `202` means accepted
+  into the queue, not delivered.
+- **Sensitive payload:** the activation token is AES-256-GCM encrypted before
+  the notification request and stored ciphertext-only in the database. The
+  worker decrypts it only for the `auth-account-activation` plain-text email
+  template. Both services need the same base64-encoded 32-byte key from a
+  secrets manager.
 - **Outbound:** async events on the broker (delivery status), so consumers
   react without polling.
 - **Contracts:** versioned event schemas; `correlation_id` propagated

@@ -8,6 +8,7 @@ import {
   Post,
   Req,
   Logger,
+  UseGuards,
 } from '@nestjs/common'
 import type { Request } from 'express'
 import {
@@ -24,9 +25,12 @@ import { NotificationNotFoundException } from '@/common/exceptions/notification.
 import { SendNotificationDto } from '@/notification/dto/send-notification.dto.js'
 import { NotificationStatusResponseDto } from '@/notification/dto/notification-status-response.dto.js'
 import { NotificationService } from '@/notification/notification.service.js'
+import { NotificationApiKeyGuard } from '@/notification/notification-api-key.guard.js'
+import { UpsertUserChannelDto } from '@/notification/dto/upsert-user-channel.dto.js'
 
 @ApiTags('notifications')
 @Controller('notifications')
+@UseGuards(NotificationApiKeyGuard)
 export class NotificationController {
   private readonly logger = new Logger(NotificationController.name)
 
@@ -34,6 +38,23 @@ export class NotificationController {
     private readonly notificationService: NotificationService,
     private readonly prisma: PrismaService,
   ) {}
+
+  @Post('channels')
+  @HttpCode(204)
+  @ApiOperation({
+    summary: 'Register or update a user delivery channel',
+    description:
+      'Internal service endpoint used to register the delivery address for a user before queuing notifications.',
+  })
+  @ApiHeader({
+    name: 'x-api-key',
+    description: 'Internal service API key.',
+    required: true,
+  })
+  @ApiResponse({ status: 204, description: 'Delivery channel saved.' })
+  upsertChannel(@Body() dto: UpsertUserChannelDto): Promise<void> {
+    return this.notificationService.upsertChannel(dto)
+  }
 
   @Post()
   @HttpCode(202)
@@ -45,6 +66,11 @@ export class NotificationController {
   @ApiHeader({
     name: 'Idempotency-Key',
     description: 'Unique key used to deduplicate repeated send requests.',
+    required: true,
+  })
+  @ApiHeader({
+    name: 'x-api-key',
+    description: 'Internal service API key.',
     required: true,
   })
   @ApiResponse({
@@ -69,6 +95,11 @@ export class NotificationController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Get the delivery status of a notification' })
+  @ApiHeader({
+    name: 'x-api-key',
+    description: 'Internal service API key.',
+    required: true,
+  })
   @ApiParam({ name: 'id', description: 'Notification id (e.g. ntf_...)' })
   @ApiResponse({
     status: 200,
