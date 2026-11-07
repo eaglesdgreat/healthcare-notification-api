@@ -5,8 +5,11 @@ service:=ms-notification
 NODE_ENV:=dev
 COMMIT_HASH = $(shell git rev-parse --verify HEAD)
 
-.PHONY: start
-start:
+.PHONY: network start
+network:
+	docker network inspect healthcare-internal >/dev/null 2>&1 || docker network create healthcare-internal
+
+start: network
 	docker-compose -p ${project} up -d
 
 .PHONY: stop
