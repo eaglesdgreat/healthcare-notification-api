@@ -164,6 +164,14 @@ semicolon-separated string. `errorCode` is machine-readable and stable.
 Do not expose `/api/metrics` directly to the public internet in production.
 Permit only the Prometheus scraper or the private service network to access it.
 
+The local notification Compose service joins the external `healthcare-internal`
+network so Auth can reach it by the Docker service name
+`http://ms-notification-api:5502`. Start the frontend gateway (or run
+`make network` in this repository) before starting this stack. The host port is
+bound to loopback for local diagnostics only. Notification enqueue and channel
+registration require the service API key and are intentionally not routed to
+browser clients by the public API gateway.
+
 ## API documentation (Swagger / OpenAPI)
 
 Interactive API docs are served at `/api/docs` when the app is running

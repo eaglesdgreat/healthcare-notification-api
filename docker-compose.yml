@@ -1,9 +1,6 @@
 services:
   ms-notification-api:
     container_name: ms-notification-api
-    labels:
-      - 'traefik.enable=true'
-      - 'traefik.http.routers.ms-notification-api.rule=PathPrefix(`/notifications`)'
     user: root
     build:
       context: .
@@ -13,7 +10,7 @@ services:
       # The "Volume Trick": prevents local node_modules from overwriting container ones
       - /app/node_modules
     ports:
-      - 5502:5502
+      - 127.0.0.1:5502:5502
     env_file:
       - ./.env
     links:
@@ -34,6 +31,9 @@ services:
       # TypeScript's watch mode does NOT respect CHOKIDAR_USEPOLLING.
       # Force polling for Windows Docker bind mounts.
       - TSC_WATCHFILE=DynamicPriorityPolling
+    networks:
+      - default
+      - healthcare-internal
     # Wait for DB and Redis to be ready before running migrations + Nest
     command: >
       sh -c "./shell/wait-for.sh ms-notification-db:5432 -- ./shell/wait-for.sh ms-notification-redis:6379 -- sh ./shell/start-dev.sh"
@@ -42,7 +42,7 @@ services:
     container_name: ms-notification-db
     image: postgres:16-alpine
     ports:
-      - 5406:5432
+      - 127.0.0.1:5406:5432
     expose:
       - 5432
     env_file:
@@ -55,10 +55,16 @@ services:
     container_name: ms-notification-redis
     image: redis:7-alpine
     ports:
-      - 5407:6379
+      - 127.0.0.1:5407:6379
     expose:
       - 6379
     restart: always
 
 volumes:
   ms-notification-db_vol:
+
+networks:
+  default: {}
+  healthcare-internal:
+    external: true
+    name: healthcare-internal
